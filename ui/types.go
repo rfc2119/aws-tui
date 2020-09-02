@@ -1,10 +1,10 @@
 package ui
 
 import (
-
 	"github.com/rivo/tview"
 	// "rfc2119/aws-tui/model"
 )
+
 // type viewComponent struct {
 // 	ID      string           // unique id for the component; assigned as the address of the actual ui element
 // 	Service string           // which service does this component serve ? see below for defintion of services
@@ -15,16 +15,12 @@ import (
 // a general representation of a model and view
 type service struct {
 	// View    []viewComponent
-	MainApp *tview.Application
+	MainApp  *tview.Application
 	RootPage *tview.Pages
-
 }
+
 // as usual, root.go contains some type definitions and configs
 // exported methods of names similar to the original ui elements are prefixed with the vowel 'E' (capital E) for no reason. similarily, 'e' prefixes the custom ui elements defined
-
-
-
-
 
 // ePage definition and methods
 type ePage struct {
@@ -35,18 +31,20 @@ type ePage struct {
 // eGrid definition and methods
 type eGrid struct {
 	*tview.Grid
-    members []*tview.Primitive      // TODO: KeyCtrlW
+	Members              []*tview.Primitive // TODO: KeyCtrlW
+	CurrentMemberInFocus int                // index of the current member that has focus
 }
 
 func NewEgrid() *eGrid {
 	return &eGrid{
-		Grid:    tview.NewGrid(),
-		members: []*tview.Primitive{},
+		Grid:                 tview.NewGrid(),
+		Members:              []*tview.Primitive{},
+		CurrentMemberInFocus: 0,
 	}
 }
 func (g *eGrid) EAddItem(p tview.Primitive, row, column, rowSpan, colSpan, minGridHeight, minGridWidth int, focus bool) *eGrid {
 
 	g.AddItem(p, row, column, rowSpan, colSpan, minGridHeight, minGridWidth, focus)
-	g.members = append(g.members, &p)
-    return g
+	g.Members = append(g.Members, &p)
+	return g
 }

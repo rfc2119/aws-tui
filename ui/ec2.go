@@ -1,38 +1,39 @@
 package ui
 
 import (
-    "fmt"
+	"fmt"
 
-    "rfc2119/aws-tui/model"
-    // "rfc2119/aws-tui/common"
-	"github.com/gdamore/tcell"
+	"rfc2119/aws-tui/model"
+	// "rfc2119/aws-tui/common"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/gdamore/tcell"
 	"github.com/rivo/tview"
-
 )
+
 const (
-COL_ID = iota
-COL_AMI
-COL_TYPE
-COL_STATE
-COL_STATEREASON
-
+	COL_ID = iota
+	COL_AMI
+	COL_TYPE
+	COL_STATE
+	COL_STATEREASON
 )
 
-	// local ui elements
-	var grid = NewEgrid()	// the main container
-	var description = tview.NewTextView()	// instance description
-	var table = tview.NewTable()	// instance status as in web ui
-	// flex := tview.NewFlex()
-	var colNames = []string{"ID", "AMI", "Type", "State", "StateReason"}	// TODO
+// local ui elements
+var grid = NewEgrid()                 // the main container
+var description = tview.NewTextView() // instance description
+var table = tview.NewTable()          // instance status as in web ui
+// var flex = tview.NewFlex()
+var statusBar = tview.NewTextView()
+var colNames = []string{"ID", "AMI", "Type", "State", "StateReason"} // TODO
 
 // TODO: it doens't make sense to export the type and have a New() function in the same time
 type ec2Service struct {
 	service
-	Model   *model.EC2Model
+	Model *model.EC2Model
 }
+
 // config: the aws client config that will create the service (the underlying model)
-func NewEC2Service(config aws.Config, app *tview.Application, rootPage *tview.Pages) *ec2Service{
+func NewEC2Service(config aws.Config, app *tview.Application, rootPage *tview.Pages) *ec2Service {
 
 	// var components []viewComponent
 	// for _, elm := range elements {
@@ -45,8 +46,8 @@ func NewEC2Service(config aws.Config, app *tview.Application, rootPage *tview.Pa
 	// 	components = append(components, viewComponent)
 	// }
 	return &ec2Service{
-		service: service {
-			MainApp: app,
+		service: service{
+			MainApp:  app,
 			RootPage: rootPage,
 		},
 		Model: model.NewEC2Model(config),
@@ -55,7 +56,7 @@ func NewEC2Service(config aws.Config, app *tview.Application, rootPage *tview.Pa
 
 func (ec2svc *ec2Service) InitView() {
 
-	reservations := ec2svc.Model.GetEC2Instances()	// directly invokes a method on the model
+	reservations := ec2svc.Model.GetEC2Instances() // directly invokes a method on the model
 
 	for halpIdx := 0; halpIdx < len(colNames); halpIdx++ {
 		table.SetCell(0, halpIdx,
@@ -72,13 +73,9 @@ func (ec2svc *ec2Service) InitView() {
 			table.SetCell(rowIdx+1, colIdx, cell)
 		}
 	}
-	table.SetBorders(false)
-	table.SetSelectable(true, false) // rows: true, colums: false means select only rows
-	table.Select(1, 1)
-	table.SetFixed(0, 3)
 	table.SetDoneFunc(func(key tcell.Key) {
 		if key == tcell.KeyEscape {
-			ec2svc.RootPage.SwitchToPage("Services")		// TODO: page names and such
+			ec2svc.RootPage.SwitchToPage("Services") // TODO: page names and such
 		}
 		if key == tcell.KeyEnter {
 			table.SetSelectable(true, true)
@@ -95,28 +92,36 @@ func (ec2svc *ec2Service) InitView() {
 	})
 	grid.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyCtrlW {
-			fmt.Println("move to another item")     // TODO
-            // for _, member := range grid.members{
-            //     fmt.Printf("%#v", (*member).HasFocus())
-                // box, isBox := member.(tview.Box)
-                // if isBox {
-                // if !box.HasFocus(){
-                //     app.SetFocus(member)
-                // }
-            // }
-            // }
+			statusBar.SetText("moving to another item") // TODO
+
+			if len(grid.Members) > 0 {
+				grid.CurrentMemberInFocus++
+				grid.CurrentMemberInFocus %= len(grid.Members)
+				ec2svc.MainApp.SetFocus(*grid.Members[grid.CurrentMemberInFocus]) // * hmmm
+			}
 		}
 		return event
 	})
 
 	// ui config
-	grid.EAddItem(table, 0, 0, 1, 1, 0, 0, true)
-	grid.EAddItem(description, 1, 0, 1, 1, 0, 0, false)
-	ec2svc.RootPage.AddPage("Instances", ec2svc.GetMainElement(), true, false)	// TODO: page names and such
-
-	// return ec2svc
+	statusBar.SetText("Status")
+	table.SetBorders(false)
+	table.SetSelectable(true, false) // rows: true, colums: false means select only rows
+	table.Select(1, 1)
+	table.SetFixed(0, 3)
+	grid.SetRows(-3, -1, 2)
+	grid.EAddItem(table, 0, 0, 20, 1, 0, 0, true)
+	grid.EAddItem(description, 20, 0, 10, 1, 0, 0, false)
+	grid.EAddItem(statusBar, 30, 0, 1, 1, 0, 0, false)
+	// AddItem(item Primitive, fixedSize, proportion int, focus bool)
+	ec2svc.RootPage.AddPage("Instances", ec2svc.GetMainElement(), true, false) // TODO: page names and such
 }
 
 func (svc *ec2Service) GetMainElement() tview.Primitive {
 	return grid
+	// return flex
+}
+
+func (svc *ec2Service) WatchChanges() {
+
 }
