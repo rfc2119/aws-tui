@@ -36,7 +36,7 @@ func main() {
 
 	// application and root element
 	app := tview.NewApplication()
-	pages := tview.NewPages()
+	pages := ui.NewEPages()
 
 	// services
 	ec2svc := ui.NewEC2Service(config, app, pages)
@@ -74,7 +74,7 @@ func main() {
 	tree.SetSelectedFunc(func(node *tview.TreeNode) {
 		children := node.GetChildren()
 		if len(children) == 0 && pages.HasPage(node.GetText()) { // go to page
-			pages.SwitchToPage(node.GetText())
+			pages.ESwitchToPage(node.GetText())
 			// tview.NewModal().SetText("children").AddButtons([]string{"ok"})
 
 		} else {

@@ -18,6 +18,16 @@ const (
 	COL_STATEREASON
 )
 
+const (
+	HELP_EC2_MAIN = `
+	?		View this help message
+	d		Describe instance
+	x		Delete instance ?
+	^w		Move to neighboring windows
+	ESC		Move back one page
+	`
+)
+
 // local ui elements
 var grid = NewEgrid()                 // the main container
 var description = tview.NewTextView() // instance description
@@ -33,7 +43,7 @@ type ec2Service struct {
 }
 
 // config: the aws client config that will create the service (the underlying model)
-func NewEC2Service(config aws.Config, app *tview.Application, rootPage *tview.Pages) *ec2Service {
+func NewEC2Service(config aws.Config, app *tview.Application, rootPage *ePages) *ec2Service {
 
 	// var components []viewComponent
 	// for _, elm := range elements {
@@ -75,7 +85,7 @@ func (ec2svc *ec2Service) InitView() {
 	}
 	table.SetDoneFunc(func(key tcell.Key) {
 		if key == tcell.KeyEscape {
-			ec2svc.RootPage.SwitchToPage("Services") // TODO: page names and such
+			ec2svc.RootPage.ESwitchToPage("Services") // TODO: page names and such
 		}
 		if key == tcell.KeyEnter {
 			table.SetSelectable(true, true)
@@ -93,12 +103,13 @@ func (ec2svc *ec2Service) InitView() {
 	grid.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyCtrlW {
 			statusBar.SetText("moving to another item") // TODO
-
 			if len(grid.Members) > 0 {
 				grid.CurrentMemberInFocus++
 				grid.CurrentMemberInFocus %= len(grid.Members)
 				ec2svc.MainApp.SetFocus(*grid.Members[grid.CurrentMemberInFocus]) // * hmmm
 			}
+		}else if event.Rune() == '?' {
+			ec2svc.RootPage.DisplayHelpMessage(HELP_EC2_MAIN)
 		}
 		return event
 	})
@@ -110,9 +121,9 @@ func (ec2svc *ec2Service) InitView() {
 	table.Select(1, 1)
 	table.SetFixed(0, 3)
 	grid.SetRows(-3, -1, 2)
-	grid.EAddItem(table, 0, 0, 20, 1, 0, 0, true)
-	grid.EAddItem(description, 20, 0, 10, 1, 0, 0, false)
-	grid.EAddItem(statusBar, 30, 0, 1, 1, 0, 0, false)
+	grid.EAddItem(table, 0, 0, 30, 1, 0, 0, true)
+	grid.EAddItem(description, 30, 0, 10, 1, 0, 0, false)
+	grid.EAddItem(statusBar, 40, 0, 1, 1, 0, 0, false)
 	// AddItem(item Primitive, fixedSize, proportion int, focus bool)
 	ec2svc.RootPage.AddPage("Instances", ec2svc.GetMainElement(), true, false) // TODO: page names and such
 }
