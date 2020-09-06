@@ -3,7 +3,7 @@ package common
 import (
 
 // "github.com/rivo/tview"
-// "github.com/aws/aws-sdk-go-v2/service/ec2"
+"github.com/aws/aws-sdk-go-v2/service/ec2"
 // "github.com/aws/aws-sdk-go-v2/aws"
 )
 
@@ -11,6 +11,7 @@ import (
 
 const (
 	ACTION_INSTANCE_STATUS_UPDATE = iota // iota is a counter starting from zero
+    ACTION_INSTANCES_STATUS_UPDATE
 	ACTION_INSTANCE_HALP_ME
 
 	// defining the services themselves as numeric constants
@@ -37,7 +38,9 @@ type Action struct {
 // should expect when receiving/sending an action. these structures are the "data" field in the action
 // notice the similarity in using a name similar to the action, but in camel case
 type InstanceStatusUpdate struct {
-	NewStatus  int    // TODO: an ec2 structure
-	InstanceID string // TODO: aws.String
-	// TODO: what else do we need ?
+	NewStatus  ec2.InstanceStatus
+	// InstanceID string // TODO: aws.String
+}
+type InstancesStatusUpdate struct {
+    NewStatuses []ec2.InstanceStatus
 }

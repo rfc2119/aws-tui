@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"fmt"
+    "time"
 	"rfc2119/aws-tui/common"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -27,6 +28,7 @@ func NewEC2Model(config aws.Config) *EC2Model {
 }
 
 func (svc *EC2Model) GetEC2Instances() []ec2.Reservation {
+    // TODO: use paginators; return []*ec2.Instance
 
 	req := svc.model.DescribeInstancesRequest(&ec2.DescribeInstancesInput{})
 	resp, err := req.Send(context.Background()) // the background context is never canceled
@@ -39,3 +41,47 @@ func (svc *EC2Model) GetEC2Instances() []ec2.Reservation {
 	// spew.Dump(resp.Reservations)
 	return resp.Reservations // TODO: nextToken and maxNumber if n instances is huge
 }
+
+// Starts an Amazon EBS-backed instance that you've previously stopped
+// Performing this operation on an instance that uses an instance store as its root device returns an error
+// func (svc *EC2Model) StartInstance(id string) {
+//     req := svc.model.StartInstancesRequest(&ec2.StartInstancesInput{})
+//     result, err := req.Send(context.Background())
+//     if err != nil {
+//         fmt.Println(err)
+//     }
+// }
+
+func (svc *EC2Model) DescribeInstanceStatus(ids []string) []ec2.InstanceStatus{
+    var input *ec2.DescribeInstanceStatusInput
+    if len(ids) > 0{
+        input = &ec2.DescribeInstanceStatusInput{InstanceIds: ids}
+
+                } else {
+                    allInstances := true
+                    input = &ec2.DescribeInstanceStatusInput{IncludeAllInstances: &allInstances}
+                }
+
+    req := svc.model.DescribeInstanceStatusRequest(input)
+                        result, err := req.Send(context.Background())
+                        if err != nil {
+                            fmt.Println(err)
+                        }
+
+    return result.InstanceStatuses
+                    }
+
+func (svc *EC2Model) DispatchRoutines() {
+        ticker := time.NewTicker(60 * time.Second)
+        for {
+            <-ticker.C
+
+            // instances status
+            payload := common.Action{
+                Type: common.ACTION_INSTANCES_STATUS_UPDATE,
+                Data: common.InstancesStatusUpdate{ NewStatuses: svc.DescribeInstanceStatus([]string{}) },
+            }
+            svc.Channel <- payload
+        }
+    }
+

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"rfc2119/aws-tui/model"
-	// "rfc2119/aws-tui/common"
+	"rfc2119/aws-tui/common"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/gdamore/tcell"
 	"github.com/rivo/tview"
@@ -133,6 +133,49 @@ func (svc *ec2Service) GetMainElement() tview.Primitive {
 	// return flex
 }
 
+// TODO: this should be changed
+// returns the row index of given instance ids in the table
+func getInstanceLocationInTable(ids []*string) []int{
+    rowIndices := make([]int, len(ids))
+    for rowIdx, id := range ids{
+            rowIndices[rowIdx] =  -1
+        for instanceIdx := 1; instanceIdx < table.GetRowCount(); instanceIdx++ {
+            if instanceId := table.GetCell(instanceIdx, COL_ID).Text; instanceId == *id{
+                rowIndices[rowIdx] =  instanceIdx
+                break
+            }
+        }
+    }
+    return rowIndices
+}
+func  handleActionInstanceStatusUpdate(action common.Action){
+    // TODO: should we re-check the inteface type ?
+    val := action.Data.(common.InstancesStatusUpdate)
+    for idx, status := range val.NewStatuses{
+        rowLocation := getInstanceLocationInTable([]*string{status.InstanceId})[0]
+        cell := table.GetCell(rowLocation, COL_STATE)
+        oldStatus := string(status.InstanceState.Name)      // state v status
+        if oldStatus != cell.Text{     // if new state
+            // cell.Text = status.InstanceStatusName
+            table.SetCell(rowLocation, COL_STATE, tview.NewTableCell(oldStatus).SetBackgroundColor(tcell.ColorGreen))
+            fmt.Printf("changed idx %d", idx)
+        }
+
+
+    }
+
+}
 func (svc *ec2Service) WatchChanges() {
 
+    go svc.Model.DispatchRoutines()
+    go func(){                      // watches changes and call the action handler
+        for {
+        action := <-svc.Model.Channel
+        switch action.Data.(type) {
+        case common.InstancesStatusUpdate:
+        case common.InstanceStatusUpdate:
+            go handleActionInstanceStatusUpdate(action)
+        }
+    }
+}()
 }
