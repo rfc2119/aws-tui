@@ -4,9 +4,8 @@ import (
 	// "context"
 	"fmt"
 	// "io/ioutil"
-
-	"rfc2119/aws-tui/common"
 	"rfc2119/aws-tui/ui"
+	"rfc2119/aws-tui/common"
 
 	// "github.com/gdamore/tcell"
 	"github.com/rivo/tview"
@@ -15,13 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws/external"
 )
 
-// func establishServiceChannels() chan services.Action {
-//
-// 	// TODO: available services
-// 	ec2Chan := make(chan services.Action)
-// 	// TODO: register a <-chan to view, chan<- to model
-// 	return ec2Chan
-// }
+// TODO: available services
 
 func main() {
 
@@ -74,7 +67,7 @@ func main() {
 	tree.SetSelectedFunc(func(node *tview.TreeNode) {
 		children := node.GetChildren()
 		if len(children) == 0 && pages.HasPage(node.GetText()) { // go to page
-			pages.ESwitchToPage(node.GetText())
+			pages.ESwitchToPage(node.GetText(), true)
 			// tview.NewModal().SetText("children").AddButtons([]string{"ok"})
 
 		} else {
