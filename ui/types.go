@@ -2,8 +2,11 @@ package ui
 
 import (
 	"fmt"
-	"github.com/rivo/tview"
+	// "log"
+	"time"
+
 	"github.com/gdamore/tcell"
+	"github.com/rivo/tview"
 	// "rfc2119/aws-tui/model"
 )
 
@@ -29,31 +32,33 @@ type service struct {
 type ePages struct {
 	*tview.Pages
 	// helpMsg string
-	previousPage	tview.Primitive
+	previousPage     tview.Primitive
 	previousPageName string
 }
 
-func NewEPages() *ePages{
+func NewEPages() *ePages {
 	return &ePages{
-		Pages: tview.NewPages(),
-		previousPage: nil,
+		Pages:            tview.NewPages(),
+		previousPage:     nil,
 		previousPageName: "",
 	}
 }
+
 // func (p *ePages) EShowPage(name string) *ePages{
 // 	p.previousPageName, p.previousPage = p.GetFrontPage()
 // 	p.ShowPage(name)
-// 
+//
 // }
 // GetFrontPage() returns the last added page that is visible, that's why we need the if visible condition
-func (p *ePages) EAddPage(name string, item tview.Primitive, resize, visible bool) *ePages{
-	if visible{
+func (p *ePages) EAddPage(name string, item tview.Primitive, resize, visible bool) *ePages {
+	if visible {
 		p.previousPageName, p.previousPage = p.GetFrontPage()
 	}
 	p.AddPage(name, item, resize, visible)
 	return p
 
 }
+
 // use only if not adding new pages (switching to pages already created)
 // TODO: often the current page is a dialog box or some confirmation message. in that case, use recordPreviousPage to not record the transition to the dialog box. this is a defeciency in the current architecture
 func (p *ePages) ESwitchToPage(name string, recordPreviousPage bool) *ePages {
@@ -64,8 +69,9 @@ func (p *ePages) ESwitchToPage(name string, recordPreviousPage bool) *ePages {
 	return p
 
 }
-// use either EAddPage or ESwitchToPage; do not use both in one call 
-func (p *ePages) EAddAndSwitchToPage(name string, item tview.Primitive, resize bool) *ePages{
+
+// use either EAddPage or ESwitchToPage; do not use both in one call
+func (p *ePages) EAddAndSwitchToPage(name string, item tview.Primitive, resize bool) *ePages {
 	p.EAddPage(name, item, resize, true)
 	p.SwitchToPage(name)
 	return p
@@ -75,18 +81,18 @@ func (p *ePages) ESwitchToPreviousPage(recordPreviousPage bool) *ePages {
 	return p.ESwitchToPage(p.previousPageName, recordPreviousPage)
 }
 
-func (p *ePages) DisplayHelpMessage(msg string) *ePages{
+func (p *ePages) DisplayHelpMessage(msg string) *ePages {
 
 	helpPage := tview.NewTextView()
 	helpPage.SetBackgroundColor(tcell.ColorBlue).SetTitle("HALP").SetTitleAlign(tview.AlignCenter).SetBorder(true)
 	helpPage.SetText(msg)
-	helpPage.SetDoneFunc(func(key tcell.Key){	// TODO: uhhh we can't just save the previous page as it gets destroyed; what do ? what about the recordPreviousPage boolean ?
-			// p.RemovePage("help")
-			// p.SwitchToPage(p.previousPageName)
-			p.ESwitchToPreviousPage(false)
+	helpPage.SetDoneFunc(func(key tcell.Key) { // TODO: uhhh we can't just save the previous page as it gets destroyed; what do ? what about the recordPreviousPage boolean ?
+		// p.RemovePage("help")
+		// p.SwitchToPage(p.previousPageName)
+		p.ESwitchToPreviousPage(false)
 	})
 
-	return p.EAddAndSwitchToPage("help", helpPage, true)		// "help" page gets overriden each time; resizable
+	return p.EAddAndSwitchToPage("help", helpPage, true) // "help" page gets overriden each time; resizable
 }
 func (p *ePages) GetPreviousPage() (string, tview.Primitive) {
 	return p.previousPageName, p.previousPage
@@ -96,25 +102,51 @@ func (p *ePages) GetPreviousPage() (string, tview.Primitive) {
 // eGrid definition and methods
 type eGrid struct {
 	*tview.Grid
-	Members              []*tview.Primitive // TODO: KeyCtrlW; equivalent to the unexported member 'items' in tview.Grid
+	Members              []tview.Primitive // TODO: KeyCtrlW; equivalent to the unexported member 'items' in tview.Grid
 	CurrentMemberInFocus int                // index of the current member that has focus
-	HelpMessage string
+	HelpMessage          string
+	parent               *ePages // parent is used to display help message and navigate back to previous page (TODO: maybe the grid can do this itself ?)
 }
 
-func NewEgrid() *eGrid {
-	return &eGrid{
+func NewEgrid(parentPages *ePages) *eGrid {
+	g := eGrid{
 		Grid:                 tview.NewGrid(),
-		Members:              []*tview.Primitive{},
+		Members:              []tview.Primitive{},
 		CurrentMemberInFocus: 0,
-		HelpMessage: "NO HELP MESSAGE (maybe submit a pull request ?)",
+		HelpMessage:          "NO HELP MESSAGE (maybe submit a pull request ?)",
+		parent:               parentPages,
 	}
+// SetInputCapture installs a function which captures key events before they are forwarded to the primitive's default key event handler (implemented by InputHandler())
+// g.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+// 	switch {
+// 	case event.Key() == tcell.KeyCtrlW:
+// 			// statusBar.SetText("moving to another item; statusbar focus: " + fmt.Sprintf("%s", statusBar.HasFocus())) // TODO
+// 		if len(g.Members) > 0 {
+// 			g.CurrentMemberInFocus++
+// 			if g.CurrentMemberInFocus == len(grid.Members) { //  grid.CurrentMemberInFocus %= len(grid.Members)
+// 				g.CurrentMemberInFocus = 0
+// 			}
+// 			// ec2svc.MainApp.SetFocus(*g.Members[grid.CurrentMemberInFocus]) // * hmmm
+// 			setFocus(*g.Members[g.CurrentMemberInFocus]) // * hmmm
+// 		}
+// 	case event.Rune() == '?':
+// 		// ec2svc.RootPage.DisplayHelpMessage(g.HelpMessage)
+// 		g.parent.DisplayHelpMessage(g.HelpMessage)
+// 		log.Println("FIXME") //FIXME
+// 	}
+// 	case event.Key() == tcell.KeyEscape:
+// 		g.parent.ESwitchToPreviousPage(false)
+// 
+// }
+return &g
 }
 func (g *eGrid) EAddItem(p tview.Primitive, row, column, rowSpan, colSpan, minGridHeight, minGridWidth int, focus bool) *eGrid {
 
 	g.AddItem(p, row, column, rowSpan, colSpan, minGridHeight, minGridWidth, focus)
-	g.Members = append(g.Members, &p)
+	g.Members = append(g.Members, p)
 	return g
 }
+
 
 // =============================
 // radio button primitive. copied from https://github.com/rivo/tview/blob/master/demos/primitive
@@ -174,8 +206,31 @@ func (r *RadioButtons) InputHandler() func(event *tcell.EventKey, setFocus func(
 
 // ====================
 // WIP status bar
+// TODO: the bar still gets focused when pressing ^W
 type StatusBar struct {
 	*tview.TextView
-	// options       []string
-	// currentOption int
+	durationInSeconds int // duration after which the status bar is  cleared
+}
+
+func NewStatusBar() *StatusBar {
+
+	bar := StatusBar{
+		TextView:          tview.NewTextView(),
+		durationInSeconds: 3, // TODO: parameter
+	}
+	// very naiive way of clearing the text bar on regular intervals; no syncronization or context is used
+	bar.SetChangedFunc(func() {
+		time.Sleep(time.Duration(bar.durationInSeconds) * time.Second)
+		bar.Clear()
+	})
+	return &bar
+}
+
+// non-focusable status bar by ignoring all key events *crosses fingers*
+func (bar *StatusBar) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+	return nil
+}
+
+func (bar *StatusBar) Focus(delegate func(p tview.Primitive)){
+	bar.Blur()
 }

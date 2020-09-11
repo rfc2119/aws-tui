@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"log"
 
-	"rfc2119/aws-tui/model"
-	"rfc2119/aws-tui/common"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/gdamore/tcell"
 	"github.com/rivo/tview"
+	"rfc2119/aws-tui/common"
+	"rfc2119/aws-tui/model"
 )
 
 const (
@@ -30,12 +30,12 @@ const (
 	`
 )
 
-// local ui elements
-var grid = NewEgrid()                 // the main container
+// local ui elements (global ?)
+var grid *eGrid                       // the main container
 var description = tview.NewTextView() // instance description
 var table = tview.NewTable()          // instance status as in web ui
-var statusBar = tview.NewTextView()	// TODO: create a new unfocusable type
-var gridEdit = NewEgrid()
+var statusBar = NewStatusBar()        // TODO: create a new unfocusable type
+var gridEdit *eGrid
 var instanceStatusRadioButton = NewRadioButtons([]string{"Start", "Stop", "Hibernate", "Reboot", "Terminate"})
 
 // TODO: it doesn't make sense to export the type and have a New() function in the same time
@@ -69,6 +69,9 @@ func NewEC2Service(config aws.Config, app *tview.Application, rootPage *ePages) 
 
 func (ec2svc *ec2Service) InitView() {
 
+	// hacks
+	grid = NewEgrid(ec2svc.RootPage)
+	gridEdit = NewEgrid(ec2svc.RootPage)
 
 	ec2svc.drawElements()
 	ec2svc.setCallbacks()
@@ -85,13 +88,13 @@ func (ec2svc *ec2Service) InitView() {
 	grid.SetRows(-3, -1, 2)
 	grid.EAddItem(table, 0, 0, 30, 1, 0, 0, true)
 	grid.EAddItem(description, 30, 0, 10, 1, 0, 0, false)
-	grid.EAddItem(statusBar, 40, 0, 1, 1, 0, 0, false)	// AddItem(p Primitive, row, column, rowSpan, colSpan, minGridHeight, minGridWidth int, focus bool) 
+	grid.EAddItem(statusBar, 40, 0, 1, 1, 0, 0, false) // AddItem(p Primitive, row, column, rowSpan, colSpan, minGridHeight, minGridWidth int, focus bool)
 
 	instanceStatusRadioButton.SetBorder(true).SetTitle("HALP")
-	gridEdit.SetSize(2, 4, 10, 10)		// SetSize(numRows, numColumns, rowSize, columnSize int)
+	gridEdit.SetSize(2, 4, 10, 10) // SetSize(numRows, numColumns, rowSize, columnSize int)
 	gridEdit.EAddItem(instanceStatusRadioButton, 0, 0, 1, 2, 0, 0, false)
 
-	ec2svc.RootPage.EAddPage("Instances", grid, true, false) // TODO: page names and such; resize=true, visible=false
+	ec2svc.RootPage.EAddPage("Instances", grid, true, false)         // TODO: page names and such; resize=true, visible=false
 	ec2svc.RootPage.EAddPage("Edit Instance", gridEdit, true, false) // TODO: page names and such
 
 	ec2svc.WatchChanges()
@@ -102,7 +105,7 @@ func (ec2svc *ec2Service) InitView() {
 func (ec2svc *ec2Service) drawElements() {
 	// draw main table
 	colNames := []string{"ID", "AMI", "Type", "State", "StateReason"} // TODO
-	reservations := ec2svc.Model.GetEC2Instances() // directly invokes a method on the model
+	reservations := ec2svc.Model.GetEC2Instances()                    // directly invokes a method on the model
 	for halpIdx := 0; halpIdx < len(colNames); halpIdx++ {
 		table.SetCell(0, halpIdx,
 			tview.NewTableCell(colNames[halpIdx]).SetAlign(tview.AlignCenter).SetSelectable(false))
@@ -121,7 +124,7 @@ func (ec2svc *ec2Service) drawElements() {
 
 	// TODO: this is only here because of `reservations`; change that ASAP; FIXME this is broken
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Rune() == 'd'{
+		if event.Rune() == 'd' {
 			row, _ := table.GetSelection()
 			description.SetText(fmt.Sprintf("%v", reservations[row-1].Instances[0]))
 		}
@@ -145,12 +148,12 @@ func (ec2svc *ec2Service) setCallbacks() {
 
 	})
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		switch event.Rune(){
+		switch event.Rune() {
 		// case 'd' :
 		// 	row, _ := table.GetSelection()
 		// 	description.SetText(fmt.Sprintf("%v", reservations[row-1].Instances[0]))
-		case 'e' :
-			ec2svc.RootPage.ESwitchToPage("Edit Instance", true)	// TODO: page names and such
+		case 'e':
+			ec2svc.RootPage.ESwitchToPage("Edit Instance", true) // TODO: page names and such
 
 		}
 
@@ -159,15 +162,30 @@ func (ec2svc *ec2Service) setCallbacks() {
 
 	// main grid
 	grid.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyCtrlW {
-			// statusBar.SetText("moving to another item") // TODO
+		switch event.Key() {
+		case tcell.KeyCtrlW:
+			statusBar.SetText("moving to another item; statusbar focus: " + fmt.Sprintf("%s", statusBar.HasFocus())) // TODO
 			if len(grid.Members) > 0 {
 				grid.CurrentMemberInFocus++
-				grid.CurrentMemberInFocus %= len(grid.Members)
-				ec2svc.MainApp.SetFocus(*grid.Members[grid.CurrentMemberInFocus]) // * hmmm
+				if grid.CurrentMemberInFocus == len(grid.Members) { //  grid.CurrentMemberInFocus %= len(grid.Members)
+					grid.CurrentMemberInFocus = 0
+				}
+				for { // a HACK to not focus on non-focusable items
+					nextMemberToFocus := grid.Members[grid.CurrentMemberInFocus]
+					ec2svc.MainApp.SetFocus(nextMemberToFocus)
+					if !nextMemberToFocus.GetFocusable().HasFocus() {          // item didn't get focus despite giving it. cycle to the next member
+						grid.CurrentMemberInFocus++
+						if grid.CurrentMemberInFocus == len(grid.Members) { //  grid.CurrentMemberInFocus %= len(grid.Members)
+							grid.CurrentMemberInFocus = 0
+						}
+					}else { break }
+				}
 			}
-		}else if event.Rune() == '?' {
-			ec2svc.RootPage.DisplayHelpMessage(grid.HelpMessage)
+		case tcell.KeyRune:
+			switch event.Rune() {
+			case '?':
+				ec2svc.RootPage.DisplayHelpMessage(grid.HelpMessage)
+			}
 		}
 		return event
 	})
@@ -181,6 +199,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 	})
 }
 
+//
 func (svc *ec2Service) GetMainElement() tview.Primitive {
 	return grid
 	// return flex
@@ -189,14 +208,14 @@ func (svc *ec2Service) GetMainElement() tview.Primitive {
 // dispatches goroutines to monitor changes; assigns listeners to each action
 func (svc *ec2Service) WatchChanges() {
 	svc.Model.DispatchWatchers()
-	go func(ch <-chan common.Action){		// listner goroutine
+	go func(ch <-chan common.Action) { // listner goroutine
 		for {
 			receiveMe := <-ch
 			// log.Println("listener received data")
 			// switch receiveMe.Data.(type){	// FIXME (see below)
-			switch receiveMe.Type{
-			// case common.InstanceStatusesUpdate:	// FIXME why doesn't this work ? received type is []ec2.InstanceStatus 
-		case common.ACTION_INSTANCE_STATUS_UPDATE:
+			switch receiveMe.Type {
+			// case common.InstanceStatusesUpdate:	// FIXME why doesn't this work ? received type is []ec2.InstanceStatus
+			case common.ACTION_INSTANCE_STATUS_UPDATE:
 				// log.Println("listener 1 is dispatched")
 				go listener1(receiveMe)
 			default:
@@ -208,11 +227,11 @@ func (svc *ec2Service) WatchChanges() {
 }
 
 // listener for watcher1
-func listener1(action common.Action){
+func listener1(action common.Action) {
 
 	statuses := action.Data.(common.InstanceStatusesUpdate)
 	for _, status := range statuses {
-		rowIdx := rowIndexFromTable(table, *status.InstanceId)		// TODO: check for -1
+		rowIdx := rowIndexFromTable(table, *status.InstanceId) // TODO: check for -1
 		cell := table.GetCell(rowIdx, COL_STATE)
 		newState := string(status.InstanceState.Name)
 		// log.Printf("old state: %s cell: %s", newState, cell.Text)
@@ -230,9 +249,9 @@ func listener1(action common.Action){
 // given an instance ID, return the row index of the instance in table t
 func rowIndexFromTable(t *tview.Table, instanceID string) int {
 	idx := -1
-	for rowIdx := 1; rowIdx < t.GetRowCount(); rowIdx++{	// 1 because first row is for column labels
+	for rowIdx := 1; rowIdx < t.GetRowCount(); rowIdx++ { // 1 because first row is for column labels
 		id := t.GetCell(rowIdx, COL_ID).Text
-		if instanceID == id{
+		if instanceID == id {
 			idx = rowIdx
 			break
 		}
@@ -241,8 +260,8 @@ func rowIndexFromTable(t *tview.Table, instanceID string) int {
 }
 
 // colorize a row in a given table
-func colorizeRowInTable(t *tview.Table, row int, color tcell.Color){
-	for col := 0; col < t.GetColumnCount(); col++{
+func colorizeRowInTable(t *tview.Table, row int, color tcell.Color) {
+	for col := 0; col < t.GetColumnCount(); col++ {
 		t.GetCell(row, col).SetBackgroundColor(color)
 	}
 }
