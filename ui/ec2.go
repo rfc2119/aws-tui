@@ -3,12 +3,13 @@ package ui
 import (
 	"fmt"
 	"log"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/gdamore/tcell"
-	"github.com/rivo/tview"
 	"rfc2119/aws-tui/common"
 	"rfc2119/aws-tui/model"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"		// TODO: should probably remove this
+	"github.com/gdamore/tcell"
+	"github.com/rivo/tview"
 )
 
 const (
@@ -30,7 +31,7 @@ const (
 	`
 )
 
-// local ui elements (global ?)
+// global ui elements (TODO: perhaps i should make them local somehow)
 var grid *eGrid                       // the main container
 var description = tview.NewTextView() // instance description
 var table = tview.NewTable()          // instance status as in web ui
@@ -38,11 +39,15 @@ var statusBar = NewStatusBar()        // TODO: create a new unfocusable type
 var gridEdit *eGrid
 var instanceStatusRadioButton = NewRadioButtons([]string{"Start", "Stop", "Hibernate", "Reboot", "Terminate"})
 
+
 // TODO: it doesn't make sense to export the type and have a New() function in the same time
 type ec2Service struct {
 	service
 	Model *model.EC2Model
 	// logger log.Logger
+
+	// service specific data
+	reservations []ec2.Reservation		// TODO: should be []ec2.Instance
 }
 
 // config: the aws client config that will create the service (the underlying model)
@@ -92,7 +97,7 @@ func (ec2svc *ec2Service) InitView() {
 
 	instanceStatusRadioButton.SetBorder(true).SetTitle("HALP")
 	gridEdit.SetSize(2, 4, 10, 10) // SetSize(numRows, numColumns, rowSize, columnSize int)
-	gridEdit.EAddItem(instanceStatusRadioButton, 0, 0, 1, 2, 0, 0, false)
+	gridEdit.EAddItem(instanceStatusRadioButton, 0, 0, 1, 2, 0, 0, true)
 
 	ec2svc.RootPage.EAddPage("Instances", grid, true, false)         // TODO: page names and such; resize=true, visible=false
 	ec2svc.RootPage.EAddPage("Edit Instance", gridEdit, true, false) // TODO: page names and such
@@ -101,16 +106,16 @@ func (ec2svc *ec2Service) InitView() {
 
 }
 
-// draws elements with appropriate data
+// fills ui elements with appropriate initial data
 func (ec2svc *ec2Service) drawElements() {
 	// draw main table
 	colNames := []string{"ID", "AMI", "Type", "State", "StateReason"} // TODO
-	reservations := ec2svc.Model.GetEC2Instances()                    // directly invokes a method on the model
+	ec2svc.reservations = ec2svc.Model.GetEC2Instances()                    // directly invokes a method on the model
 	for halpIdx := 0; halpIdx < len(colNames); halpIdx++ {
 		table.SetCell(0, halpIdx,
 			tview.NewTableCell(colNames[halpIdx]).SetAlign(tview.AlignCenter).SetSelectable(false))
 	}
-	for rowIdx, reservation := range reservations {
+	for rowIdx, reservation := range ec2svc.reservations {
 		instanceIdCell := tview.NewTableCell(*reservation.Instances[0].InstanceId)
 		instanceAMICell := tview.NewTableCell(*reservation.Instances[0].ImageId)
 		instanceTypeCell := tview.NewTableCell(string(reservation.Instances[0].InstanceType))
@@ -122,16 +127,8 @@ func (ec2svc *ec2Service) drawElements() {
 		}
 	}
 
-	// TODO: this is only here because of `reservations`; change that ASAP; FIXME this is broken
-	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Rune() == 'd' {
-			row, _ := table.GetSelection()
-			description.SetText(fmt.Sprintf("%v", reservations[row-1].Instances[0]))
-		}
-		return event
-	})
 
-	// draw edit grid
+	// TODO: draw edit grid
 }
 
 // set function callbacks for different ui elements
@@ -149,9 +146,9 @@ func (ec2svc *ec2Service) setCallbacks() {
 	})
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Rune() {
-		// case 'd' :
-		// 	row, _ := table.GetSelection()
-		// 	description.SetText(fmt.Sprintf("%v", reservations[row-1].Instances[0]))
+		case 'd' :
+			row, _ := table.GetSelection()
+			description.SetText(fmt.Sprintf("%v", ec2svc.reservations[row-1].Instances[0]))
 		case 'e':
 			ec2svc.RootPage.ESwitchToPage("Edit Instance", true) // TODO: page names and such
 
