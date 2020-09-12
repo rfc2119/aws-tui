@@ -122,7 +122,8 @@ func (ec2svc *ec2Service) drawElements() {
 		}
 	}
 
-	// TODO: this is only here because of `reservations`; change that ASAP; FIXME this is broken
+	description.SetText(fmt.Sprintf("%v", reservations[0].Instances[0]))
+	// TODO: this is only here because of `reservations'; change that ASAP; FIXME this is broken
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Rune() == 'd' {
 			row, _ := table.GetSelection()
@@ -162,31 +163,31 @@ func (ec2svc *ec2Service) setCallbacks() {
 
 	// main grid
 	grid.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		switch event.Key() {
-		case tcell.KeyCtrlW:
-			statusBar.SetText("moving to another item; statusbar focus: " + fmt.Sprintf("%s", statusBar.HasFocus())) // TODO
-			if len(grid.Members) > 0 {
-				grid.CurrentMemberInFocus++
-				if grid.CurrentMemberInFocus == len(grid.Members) { //  grid.CurrentMemberInFocus %= len(grid.Members)
-					grid.CurrentMemberInFocus = 0
-				}
-				for { // a HACK to not focus on non-focusable items
-					nextMemberToFocus := grid.Members[grid.CurrentMemberInFocus]
-					ec2svc.MainApp.SetFocus(nextMemberToFocus)
-					if !nextMemberToFocus.GetFocusable().HasFocus() {          // item didn't get focus despite giving it. cycle to the next member
-						grid.CurrentMemberInFocus++
-						if grid.CurrentMemberInFocus == len(grid.Members) { //  grid.CurrentMemberInFocus %= len(grid.Members)
-							grid.CurrentMemberInFocus = 0
-						}
-					}else { break }
-				}
-			}
-		case tcell.KeyRune:
-			switch event.Rune() {
-			case '?':
-				ec2svc.RootPage.DisplayHelpMessage(grid.HelpMessage)
-			}
-		}
+		//switch event.Key() {
+		//case tcell.KeyCtrlW:
+		//	if len(grid.Members) > 0 {
+		//		grid.CurrentMemberInFocus++
+		//		if grid.CurrentMemberInFocus == len(grid.Members) { //  grid.CurrentMemberInFocus %= len(grid.Members)
+		//			grid.CurrentMemberInFocus = 0
+		//		}
+		//		for { // a HACK to not focus on non-focusable items
+		//			nextMemberToFocus := grid.Members[grid.CurrentMemberInFocus]
+		//			ec2svc.MainApp.SetFocus(nextMemberToFocus)
+		//			if !nextMemberToFocus.GetFocusable().HasFocus() {          // item didn't get focus despite giving it. cycle to the next member
+		//				grid.CurrentMemberInFocus++
+		//				if grid.CurrentMemberInFocus == len(grid.Members) { //  grid.CurrentMemberInFocus %= len(grid.Members)
+		//					grid.CurrentMemberInFocus = 0
+		//				}
+		//			}else { break }
+		//		}
+		//	}
+		//case tcell.KeyRune:
+		//	switch event.Rune() {
+		//	case '?':
+		//		ec2svc.RootPage.DisplayHelpMessage(grid.HelpMessage)
+		//	}
+		//}
+		statusBar.SetText( fmt.Sprintf("grid: %v; table: %v; desc: %v; bar: %v", grid.HasFocus(), table.HasFocus(), description.HasFocus(), statusBar.HasFocus())) // TODO
 		return event
 	})
 

@@ -2,7 +2,7 @@ package ui
 
 import (
 	"fmt"
-	// "log"
+	"log"
 	"time"
 
 	"github.com/gdamore/tcell"
@@ -147,7 +147,64 @@ func (g *eGrid) EAddItem(p tview.Primitive, row, column, rowSpan, colSpan, minGr
 	return g
 }
 
+var tempCount = 0
 
+func (g *eGrid) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+	// log.Println(tempCount)
+	return g.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+		tempCount++
+		if !g.HasFocus() {	// copied from original code for tview.Grid
+                        // Pass event on to child primitive.
+			log.Println("grid does not have focus")
+                        for _, member := range g.Members {
+                                if member != nil && member.GetFocusable().HasFocus() {
+                                        if handler := member.InputHandler(); handler != nil {
+                                                handler(event, setFocus)
+                                                return
+                                        }
+                                }
+                        }
+                        return
+                }
+
+		switch event.Key() {
+		case tcell.KeyCtrlW:
+
+			if len(g.Members) > 0 {
+				g.Members[g.CurrentMemberInFocus].Blur()	// un-focus current item
+				g.CurrentMemberInFocus++
+				if g.CurrentMemberInFocus == len(g.Members) { //  grid.CurrentMemberInFocus %= len(grid.Members)
+					g.CurrentMemberInFocus = 0
+				}
+				for { // a HACK to not focus on non-focusable items (like status bar)
+					nextMemberToFocus := g.Members[g.CurrentMemberInFocus]
+					// ec2svc.MainApp.SetFocus(nextMemberToFocus)
+					// nextMemberToFocus.Focus(setFocus)	// switch focus to next member
+					setFocus(nextMemberToFocus)
+					if !nextMemberToFocus.GetFocusable().HasFocus() {          // item didn't get focus despite forcing it. cycle to the next member
+						log.Printf("whoops! %T didn't get focused", nextMemberToFocus)
+						g.CurrentMemberInFocus++
+						if g.CurrentMemberInFocus == len(g.Members) { //  grid.CurrentMemberInFocus %= len(grid.Members)
+							g.CurrentMemberInFocus = 0
+						}
+						continue
+					}
+                                        // if handler := nextMemberToFocus.InputHandler(); handler != nil {
+					// 	// log.Printf("child %T should execute keyboard input now", nextMemberToFocus)
+                                        //         handler(event, setFocus)
+					// }
+					break
+				}
+			}
+		case tcell.KeyRune:
+			switch event.Rune() {
+			case '?':
+				g.parent.DisplayHelpMessage(g.HelpMessage)
+			}
+		}
+
+	})
+}
 // =============================
 // radio button primitive. copied from https://github.com/rivo/tview/blob/master/demos/primitive
 // RadioButtons implements a simple primitive for radio button selections.

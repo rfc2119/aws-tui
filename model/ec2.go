@@ -36,15 +36,17 @@ func NewEC2Model(config aws.Config) *EC2Model {
 
 func (mdl *EC2Model) GetEC2Instances() []ec2.Reservation {
 
+	var resp *ec2.DescribeInstancesResponse
+	var err error
 	req := mdl.model.DescribeInstancesRequest(&ec2.DescribeInstancesInput{})
-	resp, err := req.Send(context.Background()) // the background context is never canceled
-	if err != nil {                             // TODO: recover, as this get us a segfault when request fails (maybe return an empty reservation ?)
-		log.Println(err)
+	for {			// TODO: remove this
+		resp, err = req.Send(context.Background()) // the background context is never canceled
+		if err != nil {                             // TODO: recover, as this get us a segfault when request fails (maybe return an empty reservation ?)
+			log.Println(err)
+			continue
+		}
+		break
 	}
-	// fmt.Printf("%T:%#v", resp, resp)
-	// spew.Dump(resp.Reservations[0].Instances[0].ImageId)
-	// fmt.Println(resp.Reservations)
-	// spew.Dump(resp.Reservations)
 	return resp.Reservations // TODO: nextToken and maxNumber if n instances is huge (use pagination)
 }
 
@@ -64,6 +66,7 @@ func (mdl *EC2Model) DispatchWatchers() {
 
 // What the duck ? DescribeInstanceStatus (the API itself) requires that an instance be in the running state
 // TODO: not sure this is the best way to do this
+// TODO: gracefully handle errors
 func watcher1(client *ec2.Client, ch chan<- common.Action, describeAll bool){
 	// mdl.watchers = append(mdl.watchers, watcher)
 

@@ -3,14 +3,10 @@ package main
 import (
 	// "context"
 	"fmt"
-	// "io/ioutil"
 	"rfc2119/aws-tui/ui"
 	"rfc2119/aws-tui/common"
 
-	// "github.com/gdamore/tcell"
 	"github.com/rivo/tview"
-	// "github.com/davecgh/go-spew/spew"
-	// "strings"
 	"github.com/aws/aws-sdk-go-v2/aws/external"
 )
 
