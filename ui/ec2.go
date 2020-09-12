@@ -22,13 +22,17 @@ const (
 
 const (
 	HELP_EC2_MAIN = `
-	?		View this help message
-	d		Describe instance
-	x		Delete instance ? (TODO)
-	e		Edit instance	(TODO)
-	^w		Move to neighboring windows
-	ESC		Move back one page (will exit this help message)
+	?               View this help message
+	d               Describe instance
+	x               Delete instance ? (TODO)
+	e               Edit instance	(TODO)
+	^w              Move to neighboring windows
+	q               Move back one page (will exit this help message)
 	`
+        HELP_EC2_EDIT_INSTANCE = `
+        Space           Select Option in a radio box
+	q               Move back one page (will exit this help message)
+        `
 )
 
 // global ui elements (TODO: perhaps i should make them local somehow)
@@ -36,6 +40,7 @@ var grid *eGrid                       // the main container
 var description = tview.NewTextView() // instance description
 var table = tview.NewTable()          // instance status as in web ui
 var gridEdit *eGrid
+var instanceOfferingsDropdown = tview.NewDropDown()
 var instanceStatusRadioButton = NewRadioButtons([]string{"Start", "Stop", "Hibernate", "Reboot", "Terminate"})
 
 // TODO: it doesn't make sense to export the type and have a New() function in the same time
@@ -96,12 +101,15 @@ func (ec2svc *ec2Service) InitView() {
 	grid.EAddItem(description, 30, 0, 10, 1, 0, 0, false)
 	// grid.EAddItem(StatusBar, 40, 0, 1, 1, 0, 0, false) // AddItem(p Primitive, row, column, rowSpan, colSpan, minGridHeight, minGridWidth int, focus bool)
 
-	instanceStatusRadioButton.SetBorder(true).SetTitle("HALP")
+	instanceStatusRadioButton.SetBorder(true).SetTitle("Status")
+        instanceOfferingsDropdown.SetLabel("Type")
+        gridEdit.HelpMessage = HELP_EC2_EDIT_INSTANCE
 	gridEdit.SetSize(2, 4, 10, 10) // SetSize(numRows, numColumns, rowSize, columnSize int)
 	gridEdit.EAddItem(instanceStatusRadioButton, 0, 0, 1, 2, 0, 0, true)
+	gridEdit.EAddItem(instanceOfferingsDropdown, 0, 2, 1, 2, 0, 0, false)
 
 	ec2svc.RootPage.EAddPage("Instances", grid, true, false)          // TODO: page names and such; resize=true, visible=false
-	ec2svc.RootPage.EAddPage("Edit Instance", gridEdit, false, false) // TODO: page names and such
+	ec2svc.RootPage.EAddPage("Edit Instance", gridEdit, true, false) // TODO: page names and such
 
 	ec2svc.WatchChanges()
 
@@ -129,6 +137,12 @@ func (ec2svc *ec2Service) drawElements() {
 	}
 
 	// TODO: draw edit grid
+        offerings := ec2svc.Model.ListOfferings()
+        opts := make([]string, len(offerings))
+        for idx := 0; idx < len(offerings); idx++{
+                opts[idx] = string(offerings[idx].InstanceType)              // TODO: [0] because no pagination
+        }
+        instanceOfferingsDropdown.SetOptions(opts, nil)
 }
 
 // set function callbacks for different ui elements
@@ -141,7 +155,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 			row, _ := table.GetSelection()
 			description.SetText(fmt.Sprintf("%v", ec2svc.reservations[row-1].Instances[0]))
 		case 'e':
-			ec2svc.RootPage.ESwitchToPage("Edit Instance", true) // TODO: page names and such
+			ec2svc.RootPage.ESwitchToPage("Edit Instance") // TODO: page names and such
 
 		}
 
@@ -151,12 +165,8 @@ func (ec2svc *ec2Service) setCallbacks() {
 	// main grid
 	grid.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
-		case tcell.KeyEscape:
-			ec2svc.RootPage.ESwitchToPage("Services", false) // TODO: page names and such
-			ec2svc.StatusBar.SetText("exit ec2")
 
 		case tcell.KeyCtrlW:
-			ec2svc.StatusBar.SetText(fmt.Sprintf("statusbar focus: %v", ec2svc.StatusBar.HasFocus())) // TODO
 			if len(grid.Members) > 0 {
 				grid.CurrentMemberInFocus++
 				if grid.CurrentMemberInFocus == len(grid.Members) { //  grid.CurrentMemberInFocus %= len(grid.Members)
@@ -178,24 +188,71 @@ func (ec2svc *ec2Service) setCallbacks() {
 		case tcell.KeyRune:
 			switch event.Rune() {
 			case '?':
-				// ec2svc.RootPage.DisplayHelpMessage(grid.HelpMessage)
 				grid.DisplayHelp()
+			case 'q':
+				ec2svc.RootPage.ESwitchToPage("Services") // TODO: page names and such
+				ec2svc.StatusBar.SetText("exit ec2")
 			}
 		}
 		return event
 	})
 
-	// edit grid
+        // edit grid (TODO: copy pasta from above)
 	gridEdit.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		ec2svc.StatusBar.SetText(fmt.Sprintf("grid: %v. radio button: %v", gridEdit.HasFocus(), instanceStatusRadioButton.HasFocus())) // TODO
-		if event.Key() == tcell.KeyEscape {
-			ec2svc.RootPage.ESwitchToPage("Instances", false) // TODO: page names and such
+                ec2svc.StatusBar.SetText(fmt.Sprintf("grid: %v. radio button: %v. dropdown: %v", gridEdit.HasFocus(), instanceStatusRadioButton.HasFocus(), instanceOfferingsDropdown.HasFocus())) // TODO
+		switch event.Key() {
+		case tcell.KeyCtrlW:
+			if len(gridEdit.Members) > 0 {
+				gridEdit.CurrentMemberInFocus++
+				if gridEdit.CurrentMemberInFocus == len(gridEdit.Members) { //  gridEdit.CurrentMemberInFocus %= len(gridEdit.Members)
+					gridEdit.CurrentMemberInFocus = 0
+				}
+				for { // a HACK to not focus on non-focusable items
+					nextMemberToFocus := gridEdit.Members[gridEdit.CurrentMemberInFocus]
+					ec2svc.MainApp.SetFocus(nextMemberToFocus)
+					if !nextMemberToFocus.GetFocusable().HasFocus() { // item didn't get focus despite giving it. cycle to the next member
+						gridEdit.CurrentMemberInFocus++
+						if gridEdit.CurrentMemberInFocus == len(gridEdit.Members) { //  gridEdit.CurrentMemberInFocus %= len(gridEdit.Members)
+							gridEdit.CurrentMemberInFocus = 0
+						}
+					} else {
+						break
+					}
+				}
+			}
+		case tcell.KeyRune:
+			switch event.Rune() {
+			case '?':
+				gridEdit.DisplayHelp()
+			case 'q':
+		                ec2svc.RootPage.ESwitchToPreviousPage()
+                        }
 		}
 		return event
 	})
+
+	// radio button
+	instanceStatusRadioButton.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEnter || event.Rune() == ' ' {
+
+			modal := tview.NewModal().
+				SetText(fmt.Sprintf("%s instance ?", instanceStatusRadioButton.GetCurrentOption())).
+				AddButtons([]string{"Ok", "Cancel"}).
+				SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+					if buttonLabel == "Ok" {
+						ec2svc.StatusBar.SetText("applying action")
+					}
+					ec2svc.RootPage.ESwitchToPreviousPage()
+					// ec2svc.RootPage.RemovePage("modal")		// TODO: is this necessary ? this will loop over all pages
+				})
+			ec2svc.RootPage.EAddAndSwitchToPage("modal", modal, false) // resize=false
+		}
+		return event
+	})
+
 }
 
-//
+
 func (svc *ec2Service) GetMainElement() tview.Primitive {
 	return grid
 	// return flex

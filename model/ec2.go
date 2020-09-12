@@ -48,10 +48,19 @@ func (mdl *EC2Model) GetEC2Instances() []ec2.Reservation {
 	return resp.Reservations // TODO: nextToken and maxNumber if n instances is huge (use pagination)
 }
 
+// lists all instance types offered
+func (mdl *EC2Model) ListOfferings() []ec2.InstanceTypeOffering{	// TODO: region, filters
+	req := mdl.model.DescribeInstanceTypeOfferingsRequest(&ec2.DescribeInstanceTypeOfferingsInput{})
+	resp, err := req.Send(context.TODO())
+	if err != nil {			// TODO: graceful error handling
+		log.Println(err)
+	}
+	return resp.InstanceTypeOfferings	// TODO: paginator
+}
+
 // DispatchWatchers sets the appropriate timer and calls each watcher
 func (mdl *EC2Model) DispatchWatchers() {
-
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)	// TODO: 5
 	// i parametrized the goroutine only to make the channel send only
 	go func(t *time.Ticker, ch chan<- common.Action, client *ec2.Client){		// dispatcher goroutine
 		for {

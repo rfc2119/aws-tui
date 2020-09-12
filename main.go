@@ -67,7 +67,7 @@ func main() {
 	tree.SetSelectedFunc(func(node *tview.TreeNode) {
 		children := node.GetChildren()
 		if len(children) == 0 && pages.HasPage(node.GetText()) { // go to page
-			pages.ESwitchToPage(node.GetText(), true)
+			pages.ESwitchToPage(node.GetText())
 			// tview.NewModal().SetText("children").AddButtons([]string{"ok"})
 
 		} else {
