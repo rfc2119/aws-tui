@@ -5,6 +5,7 @@ import (
 	// "log"
 	"time"
 
+	// "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/gdamore/tcell"
 	"github.com/rivo/tview"
 	// "rfc2119/aws-tui/model"
@@ -15,17 +16,24 @@ import (
 // 	Service string           // which service does this component serve ? see below for defintion of services
 // 	Element tview.Primitive // the ui element itself. Primitive is an interface
 // }
+type mainUI struct {
+	// View    []viewComponent
+	MainApp   *tview.Application
+	RootPage  *ePages
+	StatusBar *StatusBar
+}
+
 // services themselves are a way to group a model (the backend sdk) and the corresponding view. i don't know what will be the view as of this moment, but here goes nothing
 // each service has a structure defined in the corresponding .go file
 // a general representation of a model and view
-type service struct {
-	// View    []viewComponent
-	MainApp  *tview.Application
-	RootPage *ePages
-}
+// TODO: generalize services as a structure
+// type service struct {
+// 	*mainUI
+// 	*aws.Client
+// }
 
-// as usual, root.go contains some type definitions and configs
-// exported methods of names similar to the original ui elements are prefixed with the vowel 'E' (capital E) for no reason. similarily, 'e' prefixes the custom ui elements defined
+// as usual, types.go contains some type definitions and configs
+// exported methods of names similar to the original ui elements (from tview package) are prefixed with the vowel 'E' (capital E) for no reason. similarily, 'e' prefixes the custom ui elements defined
 
 // =================================
 // ePages definition and methods
@@ -103,7 +111,7 @@ func (p *ePages) GetPreviousPage() (string, tview.Primitive) {
 type eGrid struct {
 	*tview.Grid
 	Members              []tview.Primitive // TODO: KeyCtrlW; equivalent to the unexported member 'items' in tview.Grid
-	CurrentMemberInFocus int                // index of the current member that has focus
+	CurrentMemberInFocus int               // index of the current member that has focus
 	HelpMessage          string
 	parent               *ePages // parent is used to display help message and navigate back to previous page (TODO: maybe the grid can do this itself ?)
 }
@@ -116,29 +124,29 @@ func NewEgrid(parentPages *ePages) *eGrid {
 		HelpMessage:          "NO HELP MESSAGE (maybe submit a pull request ?)",
 		parent:               parentPages,
 	}
-// SetInputCapture installs a function which captures key events before they are forwarded to the primitive's default key event handler (implemented by InputHandler())
-// g.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-// 	switch {
-// 	case event.Key() == tcell.KeyCtrlW:
-// 			// statusBar.SetText("moving to another item; statusbar focus: " + fmt.Sprintf("%s", statusBar.HasFocus())) // TODO
-// 		if len(g.Members) > 0 {
-// 			g.CurrentMemberInFocus++
-// 			if g.CurrentMemberInFocus == len(grid.Members) { //  grid.CurrentMemberInFocus %= len(grid.Members)
-// 				g.CurrentMemberInFocus = 0
-// 			}
-// 			// ec2svc.MainApp.SetFocus(*g.Members[grid.CurrentMemberInFocus]) // * hmmm
-// 			setFocus(*g.Members[g.CurrentMemberInFocus]) // * hmmm
-// 		}
-// 	case event.Rune() == '?':
-// 		// ec2svc.RootPage.DisplayHelpMessage(g.HelpMessage)
-// 		g.parent.DisplayHelpMessage(g.HelpMessage)
-// 		log.Println("FIXME") //FIXME
-// 	}
-// 	case event.Key() == tcell.KeyEscape:
-// 		g.parent.ESwitchToPreviousPage(false)
-// 
-// }
-return &g
+	// SetInputCapture installs a function which captures key events before they are forwarded to the primitive's default key event handler (implemented by InputHandler())
+	// g.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+	// 	switch {
+	// 	case event.Key() == tcell.KeyCtrlW:
+	// 			// statusBar.SetText("moving to another item; statusbar focus: " + fmt.Sprintf("%s", statusBar.HasFocus())) // TODO
+	// 		if len(g.Members) > 0 {
+	// 			g.CurrentMemberInFocus++
+	// 			if g.CurrentMemberInFocus == len(grid.Members) { //  grid.CurrentMemberInFocus %= len(grid.Members)
+	// 				g.CurrentMemberInFocus = 0
+	// 			}
+	// 			// ec2svc.MainApp.SetFocus(*g.Members[grid.CurrentMemberInFocus]) // * hmmm
+	// 			setFocus(*g.Members[g.CurrentMemberInFocus]) // * hmmm
+	// 		}
+	// 	case event.Rune() == '?':
+	// 		// ec2svc.RootPage.DisplayHelpMessage(g.HelpMessage)
+	// 		g.parent.DisplayHelpMessage(g.HelpMessage)
+	// 		log.Println("FIXME") //FIXME
+	// 	}
+	// 	case event.Key() == tcell.KeyEscape:
+	// 		g.parent.ESwitchToPreviousPage(false)
+	//
+	// }
+	return &g
 }
 func (g *eGrid) EAddItem(p tview.Primitive, row, column, rowSpan, colSpan, minGridHeight, minGridWidth int, focus bool) *eGrid {
 
@@ -147,14 +155,17 @@ func (g *eGrid) EAddItem(p tview.Primitive, row, column, rowSpan, colSpan, minGr
 	return g
 }
 
+func (g *eGrid) DisplayHelp() {
+	g.parent.DisplayHelpMessage(g.HelpMessage)
+}
 
 // =============================
-// radio button primitive. copied from https://github.com/rivo/tview/blob/master/demos/primitive
+// radio button primitive. copied from the demo https://github.com/rivo/tview/blob/master/demos/primitive
 // RadioButtons implements a simple primitive for radio button selections.
 type RadioButtons struct {
 	*tview.Box
 	options       []string
-	currentOption int
+	currentOption int // index of current selected option
 }
 
 // NewRadioButtons returns a new radio button primitive.
@@ -186,27 +197,36 @@ func (r *RadioButtons) Draw(screen tcell.Screen) {
 // InputHandler returns the handler for this primitive.
 func (r *RadioButtons) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
 	return r.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
-		// switch event.Key() {
-		switch {
-		case event.Rune() == 'k':
-		case event.Key() == tcell.KeyUp:
+		switch event.Key() {
+		case tcell.KeyUp:
 			r.currentOption--
 			if r.currentOption < 0 {
-				r.currentOption = 0
+				r.currentOption = len(r.options)
 			}
-		case event.Rune() == 'j':
-		case event.Key() == tcell.KeyDown:
+		case tcell.KeyDown:
 			r.currentOption++
 			if r.currentOption >= len(r.options) {
-				r.currentOption = len(r.options) - 1
+				r.currentOption = 0
+			}
+		case tcell.KeyRune:
+			switch event.Rune() {
+			case 'j': // KeyDown
+				r.currentOption++
+				if r.currentOption >= len(r.options) {
+					r.currentOption = 0
+				}
+			case 'k': // KeyUp
+				r.currentOption--
+				if r.currentOption < 0 {
+					r.currentOption = len(r.options)
+				}
 			}
 		}
 	})
 }
 
 // ====================
-// WIP status bar
-// TODO: the bar still gets focused when pressing ^W
+// status bar
 type StatusBar struct {
 	*tview.TextView
 	durationInSeconds int // duration after which the status bar is  cleared
@@ -226,11 +246,11 @@ func NewStatusBar() *StatusBar {
 	return &bar
 }
 
-// non-focusable status bar by ignoring all key events *crosses fingers*
+// non-focusable status bar by ignoring all key events and directing Focus() away
 func (bar *StatusBar) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
 	return nil
 }
 
-func (bar *StatusBar) Focus(delegate func(p tview.Primitive)){
+func (bar *StatusBar) Focus(delegate func(p tview.Primitive)) {
 	bar.Blur()
 }
