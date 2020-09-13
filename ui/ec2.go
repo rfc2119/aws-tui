@@ -24,13 +24,13 @@ const (
 	HELP_EC2_MAIN = `
 	?               View this help message
 	d               Describe instance
-	x               Delete instance ? (TODO)
+    r               Refresh list of instances
 	e               Edit instance	(TODO)
 	^w              Move to neighboring windows
 	q               Move back one page (will exit this help message)
 	`
-        HELP_EC2_EDIT_INSTANCE = `
-        Space           Select Option in a radio box
+	HELP_EC2_EDIT_INSTANCE = `
+    Space           Select Option in a radio box
 	q               Move back one page (will exit this help message)
         `
 )
@@ -41,7 +41,7 @@ var description = tview.NewTextView() // instance description
 var table = tview.NewTable()          // instance status as in web ui
 var gridEdit *eGrid
 var instanceOfferingsDropdown = tview.NewDropDown()
-var instanceStatusRadioButton = NewRadioButtons([]string{"Start", "Stop", "Hibernate", "Reboot", "Terminate"})
+var instanceStatusRadioButton = NewRadioButtons([]string{"Start", "Stop", "Hibernate", "Reboot", "Terminate"}) // all buttons are enabled by default
 
 // TODO: it doesn't make sense to export the type and have a New() function in the same time
 type ec2Service struct {
@@ -102,47 +102,34 @@ func (ec2svc *ec2Service) InitView() {
 	// grid.EAddItem(StatusBar, 40, 0, 1, 1, 0, 0, false) // AddItem(p Primitive, row, column, rowSpan, colSpan, minGridHeight, minGridWidth int, focus bool)
 
 	instanceStatusRadioButton.SetBorder(true).SetTitle("Status")
-        instanceOfferingsDropdown.SetLabel("Type")
-        gridEdit.HelpMessage = HELP_EC2_EDIT_INSTANCE
+	instanceStatusRadioButton.DisableOptionByIdx(3)
+	instanceStatusRadioButton.DisableOptionByIdx(0)
+	instanceOfferingsDropdown.SetLabel("Type")
+	gridEdit.HelpMessage = HELP_EC2_EDIT_INSTANCE
 	gridEdit.SetSize(2, 4, 10, 10) // SetSize(numRows, numColumns, rowSize, columnSize int)
 	gridEdit.EAddItem(instanceStatusRadioButton, 0, 0, 1, 2, 0, 0, true)
 	gridEdit.EAddItem(instanceOfferingsDropdown, 0, 2, 1, 2, 0, 0, false)
 
-	ec2svc.RootPage.EAddPage("Instances", grid, true, false)          // TODO: page names and such; resize=true, visible=false
+	ec2svc.RootPage.EAddPage("Instances", grid, true, false)         // TODO: page names and such; resize=true, visible=false
 	ec2svc.RootPage.EAddPage("Edit Instance", gridEdit, true, false) // TODO: page names and such
 
 	ec2svc.WatchChanges()
 
 }
 
+// TODO: // Convert *string to string value: str = aws.StringValue(strPtr)
 // fills ui elements with appropriate initial data
 func (ec2svc *ec2Service) drawElements() {
 	// draw main table
-	colNames := []string{"ID", "AMI", "Type", "State", "StateReason"} // TODO
-	ec2svc.reservations = ec2svc.Model.GetEC2Instances()              // directly invokes a method on the model
-	for halpIdx := 0; halpIdx < len(colNames); halpIdx++ {
-		table.SetCell(0, halpIdx,
-			tview.NewTableCell(colNames[halpIdx]).SetAlign(tview.AlignCenter).SetSelectable(false))
-	}
-	for rowIdx, reservation := range ec2svc.reservations {
-		instanceIdCell := tview.NewTableCell(*reservation.Instances[0].InstanceId)
-		instanceAMICell := tview.NewTableCell(*reservation.Instances[0].ImageId)
-		instanceTypeCell := tview.NewTableCell(string(reservation.Instances[0].InstanceType))
-		instanceStateCell := tview.NewTableCell(string(reservation.Instances[0].State.Name))
-		instanceStateReasonCell := tview.NewTableCell(*reservation.Instances[0].StateReason.Message)
-		cells := []*tview.TableCell{instanceIdCell, instanceAMICell, instanceTypeCell, instanceStateCell, instanceStateReasonCell}
-		for colIdx, cell := range cells {
-			table.SetCell(rowIdx+1, colIdx, cell)
-		}
-	}
+    ec2svc.fillMainTable()
 
 	// TODO: draw edit grid
-        offerings := ec2svc.Model.ListOfferings()
-        opts := make([]string, len(offerings))
-        for idx := 0; idx < len(offerings); idx++{
-                opts[idx] = string(offerings[idx].InstanceType)              // TODO: [0] because no pagination
-        }
-        instanceOfferingsDropdown.SetOptions(opts, nil)
+	offerings := ec2svc.Model.ListOfferings()
+	opts := make([]string, len(offerings))
+	for idx := 0; idx < len(offerings); idx++ {
+		opts[idx] = string(offerings[idx].InstanceType) // TODO: do not forget pagination
+	}
+	instanceOfferingsDropdown.SetOptions(opts, nil)
 }
 
 // set function callbacks for different ui elements
@@ -156,7 +143,9 @@ func (ec2svc *ec2Service) setCallbacks() {
 			description.SetText(fmt.Sprintf("%v", ec2svc.reservations[row-1].Instances[0]))
 		case 'e':
 			ec2svc.RootPage.ESwitchToPage("Edit Instance") // TODO: page names and such
-
+        case 'r':
+            ec2svc.fillMainTable()
+            ec2svc.StatusBar.SetText("refreshing instances list")
 		}
 
 		return event
@@ -197,9 +186,9 @@ func (ec2svc *ec2Service) setCallbacks() {
 		return event
 	})
 
-        // edit grid (TODO: copy pasta from above)
+	// edit grid (TODO: copy pasta from above)
 	gridEdit.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-                ec2svc.StatusBar.SetText(fmt.Sprintf("grid: %v. radio button: %v. dropdown: %v", gridEdit.HasFocus(), instanceStatusRadioButton.HasFocus(), instanceOfferingsDropdown.HasFocus())) // TODO
+		ec2svc.StatusBar.SetText(fmt.Sprintf("grid: %v. radio button: %v. dropdown: %v", gridEdit.HasFocus(), instanceStatusRadioButton.HasFocus(), instanceOfferingsDropdown.HasFocus())) // TODO
 		switch event.Key() {
 		case tcell.KeyCtrlW:
 			if len(gridEdit.Members) > 0 {
@@ -225,8 +214,8 @@ func (ec2svc *ec2Service) setCallbacks() {
 			case '?':
 				gridEdit.DisplayHelp()
 			case 'q':
-		                ec2svc.RootPage.ESwitchToPreviousPage()
-                        }
+				ec2svc.RootPage.ESwitchToPreviousPage()
+			}
 		}
 		return event
 	})
@@ -236,7 +225,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 		if event.Key() == tcell.KeyEnter || event.Rune() == ' ' {
 
 			modal := tview.NewModal().
-				SetText(fmt.Sprintf("%s instance ?", instanceStatusRadioButton.GetCurrentOption())).
+				SetText(fmt.Sprintf("%s instance ?", instanceStatusRadioButton.GetCurrentOptionName())).
 				AddButtons([]string{"Ok", "Cancel"}).
 				SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 					if buttonLabel == "Ok" {
@@ -250,14 +239,44 @@ func (ec2svc *ec2Service) setCallbacks() {
 		return event
 	})
 
+	// dropdown instance offering
+	instanceOfferingsDropdown.SetSelectedFunc(func(text string, index int) {
+
+		modal := tview.NewModal().
+			SetText(fmt.Sprintf("Change instance type to %s ?", text)).
+			AddButtons([]string{"Ok", "Cancel"}).
+			SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+				if buttonLabel == "Ok" {
+					ec2svc.StatusBar.SetText("Changing instance type to " + text)
+				}
+				ec2svc.RootPage.ESwitchToPreviousPage()
+				// ec2svc.RootPage.RemovePage("modal")		// TODO: is this necessary ? this will loop over all pages
+			})
+		ec2svc.RootPage.EAddAndSwitchToPage("modal", modal, false) // resize=false
+	})
+
 }
 
+func (ec2svc *ec2Service) fillMainTable() {
 
-func (svc *ec2Service) GetMainElement() tview.Primitive {
-	return grid
-	// return flex
+	colNames := []string{"ID", "AMI", "Type", "State", "StateReason"} // TODO
+	ec2svc.reservations = ec2svc.Model.GetEC2Instances()              // directly invokes a method on the model
+	for halpIdx := 0; halpIdx < len(colNames); halpIdx++ {
+		table.SetCell(0, halpIdx,
+			tview.NewTableCell(colNames[halpIdx]).SetAlign(tview.AlignCenter).SetSelectable(false))
+	}
+	for rowIdx, reservation := range ec2svc.reservations {
+		instanceIdCell := tview.NewTableCell(aws.StringValue(reservation.Instances[0].InstanceId))
+		instanceAMICell := tview.NewTableCell(*reservation.Instances[0].ImageId)
+		instanceTypeCell := tview.NewTableCell(string(reservation.Instances[0].InstanceType))
+		instanceStateCell := tview.NewTableCell(string(reservation.Instances[0].State.Name))
+		instanceStateReasonCell := tview.NewTableCell(*reservation.Instances[0].StateReason.Message)
+		cells := []*tview.TableCell{instanceIdCell, instanceAMICell, instanceTypeCell, instanceStateCell, instanceStateReasonCell}
+		for colIdx, cell := range cells {
+			table.SetCell(rowIdx+1, colIdx, cell)
+		}
+	}
 }
-
 // dispatches goroutines to monitor changes; assigns listeners to each action
 func (svc *ec2Service) WatchChanges() {
 	svc.Model.DispatchWatchers()
@@ -317,4 +336,9 @@ func colorizeRowInTable(t *tview.Table, row int, color tcell.Color) {
 	for col := 0; col < t.GetColumnCount(); col++ {
 		t.GetCell(row, col).SetBackgroundColor(color)
 	}
+}
+
+// tweak the edit grid according to each instance
+func modifyEditGrid(g *eGrid, instanceIdx int) {
+
 }

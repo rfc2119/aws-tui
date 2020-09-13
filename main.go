@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws/external"
 )
 
+// TODO: information about region, IAM user, sdk version used, current build version, ... etc.
 // TODO: available services
 
 func main() {
@@ -81,6 +82,7 @@ func main() {
 	mainContainer.AddItem(pages, 0, 107, true)    //AddItem(item Primitive, fixedSize, proportion int, focus bool)
 	mainContainer.AddItem(statusBar, 0, 1, false) // 107:1 seems fair ?
 	pages.EAddPage("Services", tree, true, true)  // EAddPage(name string, item tview.Primitive, resize, visible bool)
+    statusBar.SetText("Welcome to the terminal interface for AWS. Type '?' to get help")
 	if err := app.SetRoot(mainContainer, true).SetFocus(mainContainer).Run(); err != nil {
 		panic(err)
 	}

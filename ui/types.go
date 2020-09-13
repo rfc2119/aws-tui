@@ -38,14 +38,16 @@ type mainUI struct {
 // ePages definition and methods
 type ePages struct {
 	*tview.Pages
-	pageStack	[]string		// used for moving backwards one page at a time
+    HelpMessage string
+	pageStack []string // used for moving backwards one page at a time
 }
 
 func NewEPages() *ePages {
-	return &ePages{
-		Pages:            tview.NewPages(),
-		pageStack:	  []string{},
-	}
+    p := ePages{
+		Pages:     tview.NewPages(),
+		pageStack: []string{},
+    }
+    return &p
 }
 
 // same as AddPage
@@ -65,17 +67,17 @@ func (p *ePages) ESwitchToPage(name string) *ePages {
 }
 
 func (p *ePages) EAddAndSwitchToPage(name string, item tview.Primitive, resize bool) *ePages {
-	p.EAddPage(name, item, resize, false)		// visible=false as GetFrontPage() gets the last visible page
+	p.EAddPage(name, item, resize, false) // visible=false as GetFrontPage() gets the last visible page
 	return p.ESwitchToPage(name)
 
 }
 
 // use to move backward one page
 func (p *ePages) ESwitchToPreviousPage() *ePages {
-	if len(p.pageStack) > 0{
-		p.SwitchToPage(p.pageStack[len(p.pageStack) - 1])
+	if len(p.pageStack) > 0 {
+		p.SwitchToPage(p.pageStack[len(p.pageStack)-1])
 		// p.pageStack[len(p.pageStack) - 1] = nil		// TODO
-		p.pageStack = p.pageStack[:len(p.pageStack) - 1]
+		p.pageStack = p.pageStack[:len(p.pageStack)-1]
 	}
 	return p
 }
@@ -87,7 +89,7 @@ func (p *ePages) DisplayHelpMessage(msg string) *ePages {
 	helpPage.SetText(msg)
 	helpPage.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		// p.RemovePage("help")
-		if event.Rune() == 'q'{
+		if event.Rune() == 'q' {
 			p.ESwitchToPreviousPage()
 		}
 		return event
@@ -95,11 +97,12 @@ func (p *ePages) DisplayHelpMessage(msg string) *ePages {
 
 	return p.EAddAndSwitchToPage("help", helpPage, true) // "help" page gets overriden each time; resizable=true
 }
+
 // ==================================
 // eGrid definition and methods
 type eGrid struct {
 	*tview.Grid
-	Members              []tview.Primitive // TODO: KeyCtrlW; equivalent to the unexported member 'items' in tview.Grid
+	Members              []tview.Primitive // equivalent to the unexported member 'items' in tview.Grid
 	CurrentMemberInFocus int               // index of the current member that has focus
 	HelpMessage          string
 	parent               *ePages // parent is used to display help message and navigate back to previous page (TODO: maybe the grid can do this itself ?)
@@ -129,14 +132,22 @@ func (g *eGrid) DisplayHelp() {
 // =============================
 // radio button primitive. copied from the demo https://github.com/rivo/tview/blob/master/demos/primitive
 // RadioButtons implements a simple primitive for radio button selections.
+type RadioButtonOption struct {
+	name    string
+	enabled bool
+}
 type RadioButtons struct {
 	*tview.Box
-	options       []string
+	options       []RadioButtonOption
 	currentOption int // index of current selected option
 }
 
 // NewRadioButtons returns a new radio button primitive.
-func NewRadioButtons(options []string) *RadioButtons {
+func NewRadioButtons(optionNames []string) *RadioButtons {
+	options := make([]RadioButtonOption, len(optionNames))
+	for idx, name := range optionNames {
+		options[idx] = RadioButtonOption{name, true} // default: all enabled
+	}
 	return &RadioButtons{
 		Box:     tview.NewBox(),
 		options: options,
@@ -148,15 +159,19 @@ func (r *RadioButtons) Draw(screen tcell.Screen) {
 	r.Box.Draw(screen)
 	x, y, width, height := r.GetInnerRect()
 
-	for index, option := range r.options {
+	for index, option := range r.options { //FIXME: what if option #1 is disabled ?
 		if index >= height {
 			break
 		}
 		radioButton := "\u25ef" // Unchecked.
-		if index == r.currentOption {
+		if index == r.currentOption && option.enabled {
 			radioButton = "\u25c9" // Checked.
 		}
-		line := fmt.Sprintf(`%s[white]  %s`, radioButton, option)
+		format := `%s[gray] %s`
+		if option.enabled {
+			format = `%s[white] %s`
+		}
+		line := fmt.Sprintf(format, radioButton, option.name)
 		tview.Print(screen, line, x, y+index, width, tview.AlignLeft, tcell.ColorYellow)
 	}
 }
@@ -164,36 +179,47 @@ func (r *RadioButtons) Draw(screen tcell.Screen) {
 // InputHandler returns the handler for this primitive.
 func (r *RadioButtons) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
 	return r.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
-		switch event.Key() {
-		case tcell.KeyUp:
-			r.currentOption--
-			if r.currentOption < 0 {
-				r.currentOption = len(r.options) - 1
+		switch {
+		case event.Key() == tcell.KeyUp, event.Rune() == 'k':
+			for i := 0; i < len(r.options); i++ {
+				r.currentOption--
+				if r.currentOption < 0 {
+					r.currentOption = len(r.options) - 1
+				}
+				if r.options[r.currentOption].enabled {
+					break
+				}
 			}
-		case tcell.KeyDown:
-			r.currentOption++
-			if r.currentOption >= len(r.options) {
-				r.currentOption = 0
-			}
-		case tcell.KeyRune:
-			switch event.Rune() {
-			case 'j': // KeyDown
+		case event.Key() == tcell.KeyDown, event.Rune() == 'j':
+			for i := 0; i < len(r.options); i++ {
 				r.currentOption++
 				if r.currentOption >= len(r.options) {
 					r.currentOption = 0
 				}
-			case 'k': // KeyUp
-				r.currentOption--
-				if r.currentOption < 0 {
-					r.currentOption = len(r.options) - 1
+				if r.options[r.currentOption].enabled {
+					break
 				}
 			}
 		}
 	})
 }
 
-func (r *RadioButtons) GetCurrentOption() string{
-	return r.options[r.currentOption]
+// return the name of the current option
+func (r *RadioButtons) GetCurrentOptionName() string {
+	return r.options[r.currentOption].name
+}
+
+func (r *RadioButtons) DisableOptionByName(name string) {
+	for _, opt := range r.options {
+		if opt.name == name {
+			opt.enabled = false
+			break
+		}
+	}
+}
+
+func (r *RadioButtons) DisableOptionByIdx(idx int) {
+	r.options[idx].enabled = false
 }
 
 // ====================
