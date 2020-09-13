@@ -4,7 +4,6 @@ import (
 	// "context"
 	"fmt"
 	// "io/ioutil"
-
 	"rfc2119/aws-tui/common"
 	"rfc2119/aws-tui/ui"
 
@@ -15,13 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws/external"
 )
 
-// func establishServiceChannels() chan services.Action {
-//
-// 	// TODO: available services
-// 	ec2Chan := make(chan services.Action)
-// 	// TODO: register a <-chan to view, chan<- to model
-// 	return ec2Chan
-// }
+// TODO: available services
 
 func main() {
 
@@ -34,15 +27,16 @@ func main() {
 	}
 	fmt.Println("halp")
 
-	// application and root element
+	// application, root element and status bar
 	app := tview.NewApplication()
 	pages := ui.NewEPages()
+	statusBar := ui.NewStatusBar()
 
 	// services
-	ec2svc := ui.NewEC2Service(config, app, pages)
+	ec2svc := ui.NewEC2Service(config, app, pages, statusBar)
 	ec2svc.InitView()
 
-	// main ui:
+	// main ui element
 	tree := tview.NewTreeView()
 
 	// configuring the tree:
@@ -67,7 +61,6 @@ func main() {
 		}
 		_tmp.Collapse()
 		rootNode.AddChild(_tmp)
-
 	}
 	tree.SetRoot(rootNode)
 	tree.SetCurrentNode(rootNode)
@@ -83,10 +76,12 @@ func main() {
 	})
 
 	// ui config
-	// flex.AddItem(table, 0, 2, true)
-	// flex.AddItem(description, 0, 1, true)
-	pages.AddPage("Services", tree, true, true)
-	if err := app.SetRoot(pages, true).SetFocus(pages).Run(); err != nil {
+	mainContainer := tview.NewFlex() // a flex container for the status bar and application pages/window
+	mainContainer.SetDirection(tview.FlexRow).SetFullScreen(true)
+	mainContainer.AddItem(pages, 0, 107, true)    //AddItem(item Primitive, fixedSize, proportion int, focus bool)
+	mainContainer.AddItem(statusBar, 0, 1, false) // 107:1 seems fair ?
+	pages.EAddPage("Services", tree, true, true)  // EAddPage(name string, item tview.Primitive, resize, visible bool)
+	if err := app.SetRoot(mainContainer, true).SetFocus(mainContainer).Run(); err != nil {
 		panic(err)
 	}
 }
