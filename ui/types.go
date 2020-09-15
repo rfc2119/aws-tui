@@ -22,6 +22,7 @@ type mainUI struct {
 	StatusBar *StatusBar
 }
 
+
 // services themselves are a way to group a model (the backend sdk) and the corresponding view. i don't know what will be the view as of this moment, but here goes nothing
 // each service has a structure defined in the corresponding .go file
 // a general representation of a model and view
@@ -38,16 +39,16 @@ type mainUI struct {
 // ePages definition and methods
 type ePages struct {
 	*tview.Pages
-    HelpMessage string
-	pageStack []string // used for moving backwards one page at a time
+	HelpMessage string
+	pageStack   []string // used for moving backwards one page at a time
 }
 
 func NewEPages() *ePages {
-    p := ePages{
+	p := ePages{
 		Pages:     tview.NewPages(),
 		pageStack: []string{},
-    }
-    return &p
+	}
+	return &p
 }
 
 // same as AddPage
@@ -57,7 +58,7 @@ func (p *ePages) EAddPage(name string, item tview.Primitive, resize, visible boo
 
 }
 
-// use to go forward one page
+// use to go forward one page. do not use it if you intend not to go back to the page (for confirmation boxes for example). instead, use the normal tview.SwitchToPage or tview.AddAndSwitchToPage
 func (p *ePages) ESwitchToPage(name string) *ePages {
 	currentPageName, _ := p.GetFrontPage()
 	p.pageStack = append(p.pageStack, currentPageName)
@@ -97,6 +98,17 @@ func (p *ePages) DisplayHelpMessage(msg string) *ePages {
 
 	return p.EAddAndSwitchToPage("help", helpPage, true) // "help" page gets overriden each time; resizable=true
 }
+
+func (p *ePages) GetPreviousPageName() string {
+	return p.pageStack[len(p.pageStack)-1]
+}
+
+func (p *ePages) GetCurrentPageName() string {
+	currentPageName, _ := p.GetFrontPage()
+    return currentPageName
+}
+
+
 
 // ==================================
 // eGrid definition and methods

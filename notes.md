@@ -15,3 +15,6 @@ const (
     KeyBackspace2 = KeyDEL
 )
 ```
+
+# docui
+* changing between panels/items is done with app.SetFocus(); gotta see how it's done in tview.Form

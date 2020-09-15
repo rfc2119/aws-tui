@@ -259,11 +259,11 @@ func (ec2svc *ec2Service) chooseAMIFilters() {
 	}
 	prevName := ""
 	dropDownSelectedFunc := func(option string, optionIndex int) {
-        previousText, exists := filters[prevName]
-        // save current filter value if existed before or if there's new text
+		previousText, exists := filters[prevName]
+		// save current filter value if existed before or if there's new text
 		if txt := inputField.GetText(); txt != "" || exists {
-            ec2svc.StatusBar.SetText(fmt.Sprintf("prev text: %s, exists: %v, prevName: %s", previousText, exists, prevName))
-			if prevName != "" {         // avoid initial value of prevName
+			ec2svc.StatusBar.SetText(fmt.Sprintf("prev text: %s, exists: %v, prevName: %s", previousText, exists, prevName))
+			if prevName != "" { // avoid initial value of prevName
 				filters[prevName] = txt
 			}
 		}
@@ -272,7 +272,7 @@ func (ec2svc *ec2Service) chooseAMIFilters() {
 			if len(currentText) == 0 {
 				return
 			}
-        ec2svc.StatusBar.SetText(fmt.Sprintf("%s", filterValuesAutoComplete[optionIndex]))
+			ec2svc.StatusBar.SetText(fmt.Sprintf("%s", filterValuesAutoComplete[optionIndex]))
 			for _, word := range filterValuesAutoComplete[optionIndex] {
 				if strings.HasPrefix(strings.ToLower(word), strings.ToLower(currentText)) {
 					entries = append(entries, word)
@@ -289,7 +289,7 @@ func (ec2svc *ec2Service) chooseAMIFilters() {
 
 	buttonCancelFunc := func() { ec2svc.RootPage.ESwitchToPreviousPage() }
 	buttonSaveFunc := func() {
-        ec2svc.StatusBar.SetText("Grabbing the list of AMIs")
+		ec2svc.StatusBar.SetText("Grabbing the list of AMIs")
 		amis := ec2svc.Model.ListAMIs(filters)
 		tableAMI := tview.NewTable()
 
@@ -304,10 +304,10 @@ func (ec2svc *ec2Service) chooseAMIFilters() {
 			stateCell := tview.NewTableCell(string(ami.State))
 			archCell := tview.NewTableCell(string(ami.Architecture))
 			dateCell := tview.NewTableCell(*ami.CreationDate)
-            // ownerCell := tview.NewTableCell(*ami.ImageOwnerAlias)    // TODO:
+			// ownerCell := tview.NewTableCell(*ami.ImageOwnerAlias)    // TODO:
 			nameCell := tview.NewTableCell(*ami.Name)
 			ownerCell := tview.NewTableCell(*ami.OwnerId)
-			cells := []*tview.TableCell{idCell,  stateCell,archCell, dateCell, nameCell, ownerCell}
+			cells := []*tview.TableCell{idCell, stateCell, archCell, dateCell, nameCell, ownerCell}
 			for colIdx, cell := range cells {
 				tableAMI.SetCell(rowIdx+1, colIdx, cell)
 			}
@@ -319,7 +319,7 @@ func (ec2svc *ec2Service) chooseAMIFilters() {
 		tableAMI.SetDoneFunc(func(key tcell.Key) {
 			ec2svc.RootPage.ESwitchToPreviousPage()
 		})
-        ec2svc.RootPage.EAddAndSwitchToPage("AMIs", tableAMI, true)
+		ec2svc.RootPage.AddAndSwitchToPage("AMIs", tableAMI, true)
 	}
 
 	inputField = tview.NewInputField().SetLabel("Filter Value")
@@ -327,11 +327,23 @@ func (ec2svc *ec2Service) chooseAMIFilters() {
 	form.AddButton("Save", buttonSaveFunc)
 	form.AddButton("Cancel", buttonCancelFunc)
 	form.AddFormItem(inputField)
-	form.SetBorder(true).SetTitle("Filter AMIs").SetTitleAlign(tview.AlignLeft)
-	ec2svc.RootPage.EAddAndSwitchToPage("Filter AMIs", form, true) // resize=true
+	form.SetTitle("Filter AMIs").SetBorder(true)
+    ec2svc.showGenericModal("Filter AMIs", form, 80, 10)    // 80x10 seems good for my screen
 }
 
-// shows a modal box with msg and switches back to previous page. selected text is returned for convenience
+// shows a generic modal box (rather than a confirmation-only box) centered at screen
+// props to skanehira from the docker tui "docui" for this! code is at github.com/skanehira/docui
+func (ec2svc *ec2Service) showGenericModal(title string, p tview.Primitive, width, height int) {
+    centeredModal := tview.NewGrid().
+		SetColumns(0, width, 0).
+		SetRows(0, height, 0).
+		AddItem(p, 1, 1, 1, 1, 0, 0, true)
+    currPageName := ec2svc.RootPage.GetCurrentPageName()
+	ec2svc.RootPage.EAddAndSwitchToPage(title, centeredModal, true)    // resize=true
+    ec2svc.RootPage.ShowPage(currPageName)   // redraw on top of the box
+}
+
+// shows a modal box with msg and switches back to previous page. this is useful for ont-time usage (no nested boxes). selected text is returned for convenience
 func (ec2svc *ec2Service) showConfirmationBox(msg string) string {
 	var selectedButtonLabel string
 	modal := tview.NewModal().
@@ -346,6 +358,7 @@ func (ec2svc *ec2Service) showConfirmationBox(msg string) string {
 			// ec2svc.RootPage.RemovePage("modal")		// TODO: is this necessary ? this will loop over all pages
 		})
 	ec2svc.RootPage.EAddAndSwitchToPage("modal", modal, false) // resize=false
+    ec2svc.RootPage.ShowPage(ec2svc.RootPage.GetPreviousPageName())      // +1
 	return selectedButtonLabel
 }
 
