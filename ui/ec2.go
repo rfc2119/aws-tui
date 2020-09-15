@@ -5,6 +5,7 @@ import (
 	"log"
 	"rfc2119/aws-tui/common"
 	"rfc2119/aws-tui/model"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2" // TODO: should probably remove this
@@ -25,14 +26,15 @@ const (
 	?               View this help message
 	d               Describe instance
     r               Refresh list of instances
-	e               Edit instance	(TODO)
+	e               Edit instance (WIP)
 	^w              Move to neighboring windows
+    ^l              Filter and List AMIs
 	q               Move back one page (will exit this help message)
 	`
 	HELP_EC2_EDIT_INSTANCE = `
     Space           Select Option in a radio box
 	q               Move back one page (will exit this help message)
-        `
+    `
 )
 
 // global ui elements (TODO: perhaps i should make them local somehow)
@@ -102,11 +104,12 @@ func (ec2svc *ec2Service) InitView() {
 	// grid.EAddItem(StatusBar, 40, 0, 1, 1, 0, 0, false) // AddItem(p Primitive, row, column, rowSpan, colSpan, minGridHeight, minGridWidth int, focus bool)
 
 	instanceStatusRadioButton.SetBorder(true).SetTitle("Status")
+	instanceStatusRadioButton.DisableOptionByIdx(1)
+	instanceStatusRadioButton.DisableOptionByIdx(2)
 	instanceStatusRadioButton.DisableOptionByIdx(3)
-	instanceStatusRadioButton.DisableOptionByIdx(0)
 	instanceOfferingsDropdown.SetLabel("Type")
 	gridEdit.HelpMessage = HELP_EC2_EDIT_INSTANCE
-	gridEdit.SetSize(2, 4, 10, 10) // SetSize(numRows, numColumns, rowSize, columnSize int)
+	gridEdit.SetSize(2, 4, 0, 0) // SetSize(numRows, numColumns, rowSize, columnSize int)
 	gridEdit.EAddItem(instanceStatusRadioButton, 0, 0, 1, 2, 0, 0, true)
 	gridEdit.EAddItem(instanceOfferingsDropdown, 0, 2, 1, 2, 0, 0, false)
 
@@ -121,7 +124,7 @@ func (ec2svc *ec2Service) InitView() {
 // fills ui elements with appropriate initial data
 func (ec2svc *ec2Service) drawElements() {
 	// draw main table
-    ec2svc.fillMainTable()
+	ec2svc.fillMainTable()
 
 	// TODO: draw edit grid
 	offerings := ec2svc.Model.ListOfferings()
@@ -143,9 +146,9 @@ func (ec2svc *ec2Service) setCallbacks() {
 			description.SetText(fmt.Sprintf("%v", ec2svc.reservations[row-1].Instances[0]))
 		case 'e':
 			ec2svc.RootPage.ESwitchToPage("Edit Instance") // TODO: page names and such
-        case 'r':
-            ec2svc.fillMainTable()
-            ec2svc.StatusBar.SetText("refreshing instances list")
+		case 'r':
+			ec2svc.StatusBar.SetText("refreshing instances list")
+			ec2svc.fillMainTable()
 		}
 
 		return event
@@ -174,12 +177,17 @@ func (ec2svc *ec2Service) setCallbacks() {
 					}
 				}
 			}
+		case tcell.KeyCtrlL:
+			// build modal and let user choose filters
+			ec2svc.chooseAMIFilters()
+
 		case tcell.KeyRune:
 			switch event.Rune() {
 			case '?':
 				grid.DisplayHelp()
 			case 'q':
-				ec2svc.RootPage.ESwitchToPage("Services") // TODO: page names and such
+				// ec2svc.RootPage.ESwitchToPage("Services") // TODO: page names and such
+				ec2svc.RootPage.ESwitchToPreviousPage()
 				ec2svc.StatusBar.SetText("exit ec2")
 			}
 		}
@@ -223,38 +231,122 @@ func (ec2svc *ec2Service) setCallbacks() {
 	// radio button
 	instanceStatusRadioButton.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEnter || event.Rune() == ' ' {
-
-			modal := tview.NewModal().
-				SetText(fmt.Sprintf("%s instance ?", instanceStatusRadioButton.GetCurrentOptionName())).
-				AddButtons([]string{"Ok", "Cancel"}).
-				SetDoneFunc(func(buttonIndex int, buttonLabel string) {
-					if buttonLabel == "Ok" {
-						ec2svc.StatusBar.SetText("applying action")
-					}
-					ec2svc.RootPage.ESwitchToPreviousPage()
-					// ec2svc.RootPage.RemovePage("modal")		// TODO: is this necessary ? this will loop over all pages
-				})
-			ec2svc.RootPage.EAddAndSwitchToPage("modal", modal, false) // resize=false
+			ec2svc.showConfirmationBox(fmt.Sprintf("%s instance ?", instanceStatusRadioButton.GetCurrentOptionName()))
 		}
 		return event
 	})
 
 	// dropdown instance offering
 	instanceOfferingsDropdown.SetSelectedFunc(func(text string, index int) {
-
-		modal := tview.NewModal().
-			SetText(fmt.Sprintf("Change instance type to %s ?", text)).
-			AddButtons([]string{"Ok", "Cancel"}).
-			SetDoneFunc(func(buttonIndex int, buttonLabel string) {
-				if buttonLabel == "Ok" {
-					ec2svc.StatusBar.SetText("Changing instance type to " + text)
-				}
-				ec2svc.RootPage.ESwitchToPreviousPage()
-				// ec2svc.RootPage.RemovePage("modal")		// TODO: is this necessary ? this will loop over all pages
-			})
-		ec2svc.RootPage.EAddAndSwitchToPage("modal", modal, false) // resize=false
+		ec2svc.showConfirmationBox(fmt.Sprintf("Change instance type to %s ?", text))
 	})
 
+}
+
+// TODO: could this be a generic filter box ?
+func (ec2svc *ec2Service) chooseAMIFilters() {
+	var (
+		filterNames []string // need it for the dropdown
+	)
+	filters := make(map[string]string)
+	form := tview.NewForm()
+	inputField := tview.NewInputField()
+	filterValuesAutoComplete := make([][]string, len(common.AMIFilters))
+
+	for idx, filterIdx := range common.AMIFilters {
+		filterNames = append(filterNames, common.FilterNames[filterIdx][0])
+		filterValuesAutoComplete[idx] = common.FilterNames[filterIdx][1:]
+	}
+	prevName := ""
+	dropDownSelectedFunc := func(option string, optionIndex int) {
+        previousText, exists := filters[prevName]
+        // save current filter value if existed before or if there's new text
+		if txt := inputField.GetText(); txt != "" || exists {
+            ec2svc.StatusBar.SetText(fmt.Sprintf("prev text: %s, exists: %v, prevName: %s", previousText, exists, prevName))
+			if prevName != "" {         // avoid initial value of prevName
+				filters[prevName] = txt
+			}
+		}
+		// set auto complete for the current selected text. copied from demos/inputfield
+		inputField.SetAutocompleteFunc(func(currentText string) (entries []string) {
+			if len(currentText) == 0 {
+				return
+			}
+        ec2svc.StatusBar.SetText(fmt.Sprintf("%s", filterValuesAutoComplete[optionIndex]))
+			for _, word := range filterValuesAutoComplete[optionIndex] {
+				if strings.HasPrefix(strings.ToLower(word), strings.ToLower(currentText)) {
+					entries = append(entries, word)
+				}
+			}
+			if len(entries) < 1 {
+				entries = nil
+			}
+			return
+		})
+		inputField.SetText(filters[option]) // restore value for  selected option, or clear the field
+		prevName = option
+	}
+
+	buttonCancelFunc := func() { ec2svc.RootPage.ESwitchToPreviousPage() }
+	buttonSaveFunc := func() {
+        ec2svc.StatusBar.SetText("Grabbing the list of AMIs")
+		amis := ec2svc.Model.ListAMIs(filters)
+		tableAMI := tview.NewTable()
+
+		// drawing the table
+		colNames := []string{"ID", "State", "Arch", "Creation Date", "Name", "Owner ID"} // TODO
+		for halpIdx := 0; halpIdx < len(colNames); halpIdx++ {
+			tableAMI.SetCell(0, halpIdx,
+				tview.NewTableCell(colNames[halpIdx]).SetAlign(tview.AlignCenter).SetSelectable(false))
+		}
+		for rowIdx, ami := range amis {
+			idCell := tview.NewTableCell(*ami.ImageId)
+			stateCell := tview.NewTableCell(string(ami.State))
+			archCell := tview.NewTableCell(string(ami.Architecture))
+			dateCell := tview.NewTableCell(*ami.CreationDate)
+            // ownerCell := tview.NewTableCell(*ami.ImageOwnerAlias)    // TODO:
+			nameCell := tview.NewTableCell(*ami.Name)
+			ownerCell := tview.NewTableCell(*ami.OwnerId)
+			cells := []*tview.TableCell{idCell,  stateCell,archCell, dateCell, nameCell, ownerCell}
+			for colIdx, cell := range cells {
+				tableAMI.SetCell(rowIdx+1, colIdx, cell)
+			}
+		}
+		tableAMI.SetBorders(true)
+		tableAMI.SetSelectable(true, false) // rows: true, colums: false means select only rows
+		tableAMI.Select(1, 1)
+		tableAMI.SetFixed(1, 1)
+		tableAMI.SetDoneFunc(func(key tcell.Key) {
+			ec2svc.RootPage.ESwitchToPreviousPage()
+		})
+        ec2svc.RootPage.EAddAndSwitchToPage("AMIs", tableAMI, true)
+	}
+
+	inputField = tview.NewInputField().SetLabel("Filter Value")
+	form.AddDropDown("Filter Name", filterNames, 0, dropDownSelectedFunc)
+	form.AddButton("Save", buttonSaveFunc)
+	form.AddButton("Cancel", buttonCancelFunc)
+	form.AddFormItem(inputField)
+	form.SetBorder(true).SetTitle("Filter AMIs").SetTitleAlign(tview.AlignLeft)
+	ec2svc.RootPage.EAddAndSwitchToPage("Filter AMIs", form, true) // resize=true
+}
+
+// shows a modal box with msg and switches back to previous page. selected text is returned for convenience
+func (ec2svc *ec2Service) showConfirmationBox(msg string) string {
+	var selectedButtonLabel string
+	modal := tview.NewModal().
+		SetText(msg).
+		AddButtons([]string{"Ok", "Cancel"}).
+		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+			// if buttonLabel == "Ok" {
+			// 	ec2svc.StatusBar.SetText(statusMsg)
+			// }
+			selectedButtonLabel = buttonLabel
+			ec2svc.RootPage.ESwitchToPreviousPage()
+			// ec2svc.RootPage.RemovePage("modal")		// TODO: is this necessary ? this will loop over all pages
+		})
+	ec2svc.RootPage.EAddAndSwitchToPage("modal", modal, false) // resize=false
+	return selectedButtonLabel
 }
 
 func (ec2svc *ec2Service) fillMainTable() {
@@ -277,6 +369,7 @@ func (ec2svc *ec2Service) fillMainTable() {
 		}
 	}
 }
+
 // dispatches goroutines to monitor changes; assigns listeners to each action
 func (svc *ec2Service) WatchChanges() {
 	svc.Model.DispatchWatchers()

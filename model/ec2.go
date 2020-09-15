@@ -2,13 +2,11 @@ package model
 
 import (
 	"context"
-	// "fmt"
 	"log"
+    "strings"
 	"rfc2119/aws-tui/common"
 	"time"
 
-	// "github.com/apex/log"
-	// "github.com/apex/log/handlers/cli"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 )
@@ -55,6 +53,24 @@ func (mdl *EC2Model) ListOfferings() []ec2.InstanceTypeOffering { // TODO: regio
 		log.Println(err)
 	}
 	return resp.InstanceTypeOfferings // TODO: paginator
+}
+
+// lists AMIs offered
+func (mdl *EC2Model) ListAMIs(filterMap map[string]string) []ec2.Image {
+	// TODO: assert length
+	var filters []ec2.Filter
+	for filterName, filterValue := range filterMap {
+		// if filterValue != ""
+			filters = append(filters, ec2.Filter{Name: aws.String(filterName), Values: strings.Split(filterValue, ",")})
+		// }
+	}
+	req := mdl.model.DescribeImagesRequest(&ec2.DescribeImagesInput{Filters: filters})
+	resp, err := req.Send(context.TODO())
+	if err != nil { // TODO: graceful error handling
+		log.Println(err)
+	}
+
+	return resp.Images
 }
 
 // DispatchWatchers sets the appropriate timer and calls each watcher
