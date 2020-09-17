@@ -33,19 +33,19 @@ const (
 	`
 	HELP_EC2_EDIT_INSTANCE = `
     Space           Select Option in a radio box
+    ^w              Move to neighboring windows
 	q               Move back one page (will exit this help message)
     `
 )
 
 // global ui elements (TODO: perhaps i should make them local somehow)
-var grid *eGrid                       // the main container
+var instancesFlex *eFlex            // the main container
 var description = tview.NewTextView() // instance description
 var table = tview.NewTable()          // instance status as in web ui
 var gridEdit *eGrid
 var instanceOfferingsDropdown = tview.NewDropDown()
 var instanceStatusRadioButton = NewRadioButtons([]string{"Start", "Stop", "Hibernate", "Reboot", "Terminate"}) // all buttons are enabled by default
 
-// TODO: it doesn't make sense to export the type and have a New() function in the same time
 type ec2Service struct {
 	mainUI
 	Model *model.EC2Model
@@ -83,26 +83,23 @@ func (ec2svc *ec2Service) InitView() {
 
 	ec2svc.StatusBar.SetText("starting ec2 service")
 	// hacks
-	grid = NewEgrid(ec2svc.RootPage)
+	instancesFlex = NewEFlex(ec2svc.RootPage)
 	gridEdit = NewEgrid(ec2svc.RootPage)
 
 	ec2svc.drawElements()
 	ec2svc.setCallbacks()
 
 	// configuration for ui elements
-	ec2svc.StatusBar.SetText("Status")
-
 	table.SetBorders(false)
-    table.SetBorderAttributes(tcell.AttrBold)
 	table.SetSelectable(true, false) // rows: true, colums: false means select only rows
 	table.Select(1, 1)
-	table.SetFixed(0, 3)
+	table.SetFixed(0, 2)
 
-	grid.HelpMessage = HELP_EC2_MAIN
-	grid.SetRows(-3, -1, 2)
-	grid.EAddItem(table, 0, 0, 30, 1, 0, 0, true)
-	grid.EAddItem(description, 30, 0, 10, 1, 0, 0, false)
-	// grid.EAddItem(StatusBar, 40, 0, 1, 1, 0, 0, false) // AddItem(p Primitive, row, column, rowSpan, colSpan, minGridHeight, minGridWidth int, focus bool)
+	instancesFlex.HelpMessage = HELP_EC2_MAIN
+    instancesFlex.SetDirection(tview.FlexColumn)
+    instancesFlex.SetFullScreen(true)
+    instancesFlex.EAddItem(table, 0, 2, true)
+    instancesFlex.EAddItem(description, 0, 1, false)
 
 	instanceStatusRadioButton.SetBorder(true).SetTitle("Status")
 	instanceOfferingsDropdown.SetLabel("Type")
@@ -111,7 +108,7 @@ func (ec2svc *ec2Service) InitView() {
 	gridEdit.EAddItem(instanceStatusRadioButton, 0, 0, 1, 2, 0, 0, true)
 	gridEdit.EAddItem(instanceOfferingsDropdown, 0, 2, 1, 2, 0, 0, false)
 
-	ec2svc.RootPage.EAddPage("Instances", grid, true, false)         // TODO: page names and such; resize=true, visible=false
+	ec2svc.RootPage.EAddPage("Instances", instancesFlex, true, false)         // TODO: page names and such; resize=true, visible=false
 	ec2svc.RootPage.EAddPage("Edit Instance", gridEdit, true, false) // TODO: page names and such
 
 	ec2svc.WatchChanges()
@@ -124,7 +121,7 @@ func (ec2svc *ec2Service) drawElements() {
 	// draw main table
 	ec2svc.fillMainTable()
 
-	// TODO: draw edit grid
+	// TODO: draw edit instancesFlex
 	offerings := ec2svc.Model.ListOfferings()
 	opts := make([]string, len(offerings))
 	for idx := 0; idx < len(offerings); idx++ {
@@ -153,23 +150,23 @@ func (ec2svc *ec2Service) setCallbacks() {
 	})
 
     // TODO: unify grids
-	// main grid
-	grid.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+	// main instancesFlex
+	instancesFlex.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
 
 		case tcell.KeyCtrlW:
-			if len(grid.Members) > 0 {
-				grid.CurrentMemberInFocus++
-				if grid.CurrentMemberInFocus == len(grid.Members) { //  grid.CurrentMemberInFocus %= len(grid.Members)
-					grid.CurrentMemberInFocus = 0
+			if len(instancesFlex.Members) > 0 {
+				instancesFlex.CurrentMemberInFocus++
+				if instancesFlex.CurrentMemberInFocus == len(instancesFlex.Members) { //  instancesFlex.CurrentMemberInFocus %= len(instancesFlex.Members)
+					instancesFlex.CurrentMemberInFocus = 0
 				}
 				for { // a HACK to not focus on non-focusable items
-					nextMemberToFocus := grid.Members[grid.CurrentMemberInFocus]
+					nextMemberToFocus := instancesFlex.Members[instancesFlex.CurrentMemberInFocus]
 					ec2svc.MainApp.SetFocus(nextMemberToFocus)
 					if !nextMemberToFocus.GetFocusable().HasFocus() { // item didn't get focus despite giving it. cycle to the next member
-						grid.CurrentMemberInFocus++
-						if grid.CurrentMemberInFocus == len(grid.Members) { //  grid.CurrentMemberInFocus %= len(grid.Members)
-							grid.CurrentMemberInFocus = 0
+						instancesFlex.CurrentMemberInFocus++
+						if instancesFlex.CurrentMemberInFocus == len(instancesFlex.Members) { //  instancesFlex.CurrentMemberInFocus %= len(instancesFlex.Members)
+							instancesFlex.CurrentMemberInFocus = 0
 						}
 					} else {
 						break
@@ -183,11 +180,10 @@ func (ec2svc *ec2Service) setCallbacks() {
 		case tcell.KeyRune:
 			switch event.Rune() {
             case 'e':
-                ec2svc.StatusBar.SetText("E FROM GRID")
+                ec2svc.StatusBar.SetText("E FROM FLEX")
 			case '?':
-				grid.DisplayHelp()
+				instancesFlex.DisplayHelp()
 			case 'q':
-				// ec2svc.RootPage.ESwitchToPage("Services") // TODO: page names and such
 				ec2svc.RootPage.ESwitchToPreviousPage()
 				ec2svc.StatusBar.SetText("exit ec2")
 			}
@@ -197,7 +193,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 
 	// edit grid (TODO: copy pasta from above)
 	gridEdit.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		ec2svc.StatusBar.SetText(fmt.Sprintf("grid: %v. radio button: %v. dropdown: %v", gridEdit.HasFocus(), instanceStatusRadioButton.HasFocus(), instanceOfferingsDropdown.HasFocus())) // TODO
+		// ec2svc.StatusBar.SetText(fmt.Sprintf("grid: %v. radio button: %v. dropdown: %v", gridEdit.HasFocus(), instanceStatusRadioButton.HasFocus(), instanceOfferingsDropdown.HasFocus())) // TODO
 		switch event.Key() {
 		case tcell.KeyCtrlW:
 			if len(gridEdit.Members) > 0 {
@@ -232,14 +228,20 @@ func (ec2svc *ec2Service) setCallbacks() {
 	// radio button
 	instanceStatusRadioButton.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEnter || event.Rune() == ' ' {
-			ec2svc.showConfirmationBox(fmt.Sprintf("%s instance ?", instanceStatusRadioButton.GetCurrentOptionName()))
+            choice := ec2svc.showConfirmationBox(fmt.Sprintf("%s instance ?", instanceStatusRadioButton.GetCurrentOptionName()))
+            if choice == "Ok"{
+                // TODO
+            }
 		}
 		return event
 	})
 
 	// dropdown instance offering
 	instanceOfferingsDropdown.SetSelectedFunc(func(text string, index int) {
-		ec2svc.showConfirmationBox(fmt.Sprintf("Change instance type to %s ?", text))
+        choice := ec2svc.showConfirmationBox(fmt.Sprintf("Change instance type to %s ?", text))
+        if choice == "Ok" {
+            // TODO
+        }
 	})
 
 }
@@ -298,7 +300,7 @@ func (ec2svc *ec2Service) chooseAMIFilters() {
 		colNames := []string{"ID", "State", "Arch", "Creation Date", "Name", "Owner ID"} // TODO
 		for halpIdx := 0; halpIdx < len(colNames); halpIdx++ {
 			tableAMI.SetCell(0, halpIdx,
-				tview.NewTableCell(colNames[halpIdx]).SetAlign(tview.AlignCenter).SetSelectable(false))
+				tview.NewTableCell(colNames[halpIdx]).SetAlign(tview.AlignCenter).SetSelectable(false).SetAttributes(tcell.AttrBold))
 		}
 		for rowIdx, ami := range amis {
 			idCell := tview.NewTableCell(*ami.ImageId)
@@ -314,7 +316,6 @@ func (ec2svc *ec2Service) chooseAMIFilters() {
 			}
 		}
 		tableAMI.SetBorders(true)
-        tableAMI.SetBorderAttributes(tcell.AttrBold)
 		tableAMI.SetSelectable(true, false) // rows: true, colums: false means select only rows
 		tableAMI.Select(1, 1)
 		tableAMI.SetFixed(1, 1)
@@ -352,12 +353,8 @@ func (ec2svc *ec2Service) showConfirmationBox(msg string) string {
 		SetText(msg).
 		AddButtons([]string{"Ok", "Cancel"}).
 		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
-			// if buttonLabel == "Ok" {
-			// 	ec2svc.StatusBar.SetText(statusMsg)
-			// }
 			selectedButtonLabel = buttonLabel
 			ec2svc.RootPage.ESwitchToPreviousPage()
-			// ec2svc.RootPage.RemovePage("modal")		// TODO: is this necessary ? this will loop over all pages
 		})
 	ec2svc.RootPage.EAddAndSwitchToPage("modal", modal, false) // resize=false
     ec2svc.RootPage.ShowPage(ec2svc.RootPage.GetPreviousPageName())      // +1
@@ -370,7 +367,7 @@ func (ec2svc *ec2Service) fillMainTable() {
 	ec2svc.instances = ec2svc.Model.GetEC2Instances()              // directly invokes a method on the model
 	for halpIdx := 0; halpIdx < len(colNames); halpIdx++ {
 		table.SetCell(0, halpIdx,
-			tview.NewTableCell(colNames[halpIdx]).SetAlign(tview.AlignCenter).SetSelectable(false))
+			tview.NewTableCell(colNames[halpIdx]).SetAlign(tview.AlignCenter).SetSelectable(false).SetAttributes(tcell.AttrBold))
 	}
 	for rowIdx, instance := range ec2svc.instances {
 		instanceIdCell := tview.NewTableCell(aws.StringValue(instance.InstanceId))

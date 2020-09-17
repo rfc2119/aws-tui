@@ -14,7 +14,6 @@ import (
 
 // each channel is concerned with a service, and only the view to the model may use the channel. for example, for a designated ec2 worker channel, only the view responsible for ec2 may listen to the channel and consume items
 // this might break in the future. sometimes, multiple benefeciaries exist for a single work. for example, when deleting an ebs volume, the ec2 console should also make use of the deletion command/action to update the affected instance. i don't know how to approach this (yet)
-// TODO: it doens't make sense to export the type and have a New() function in the same time, right ?
 type EC2Model struct {
 	model *ec2.Client
 	// watchers []watcher		// any watcher should register itself here; a watcher is a routine that polls for changes from the model

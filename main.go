@@ -3,14 +3,11 @@ package main
 import (
 	// "context"
 	"fmt"
-	// "io/ioutil"
 	"rfc2119/aws-tui/common"
 	"rfc2119/aws-tui/ui"
 
 	// "github.com/gdamore/tcell"
 	"github.com/rivo/tview"
-	// "github.com/davecgh/go-spew/spew"
-	// "strings"
 	"github.com/aws/aws-sdk-go-v2/aws/external"
 )
 
@@ -36,11 +33,15 @@ func main() {
 	// services
 	ec2svc := ui.NewEC2Service(config, app, pages, statusBar)
 	ec2svc.InitView()
+    iamsvc := ui.NewIAMService(config, app, pages, statusBar)
 
-	// main ui element
+	// ui elements
+	mainContainer := tview.NewFlex() // a flex container for the status bar and application pages/window
+    frontPage := tview.NewFlex()    // the front page which holds the info and tree view
+    info := tview.NewTextView()
 	tree := tview.NewTreeView()
 
-	// configuring the tree:
+	// filling the tree with initial values
 	rootNode := tview.NewTreeNode("Services")
 	var topLevelNodesNames []string
 	for _, name := range common.ServiceNames {
@@ -63,8 +64,6 @@ func main() {
 		_tmp.Collapse()
 		rootNode.AddChild(_tmp)
 	}
-	tree.SetRoot(rootNode)
-	tree.SetCurrentNode(rootNode)
 	tree.SetSelectedFunc(func(node *tview.TreeNode) {
 		children := node.GetChildren()
 		if len(children) == 0 && pages.HasPage(node.GetText()) { // go to page
@@ -76,12 +75,29 @@ func main() {
 		}
 	})
 
+    // filling the info box with initial values
+    currentIAMUser := iamsvc.Model.GetCurrentUserInfo()
+    fmt.Fprintf(info,
+    `
+    IAM User name: %7s
+    IAM User arn:  %20s
+    Region:        %7s
+
+    Build Version: HALP
+    SDK Version:   Go SDK V2
+    `, *currentIAMUser.UserName, *currentIAMUser.Arn, config.Region)
+
 	// ui config
-	mainContainer := tview.NewFlex() // a flex container for the status bar and application pages/window
+	tree.SetRoot(rootNode)
+	tree.SetCurrentNode(rootNode)
+
+	frontPage.SetDirection(tview.FlexColumn)
+    frontPage.AddItem(tree, 0, 3, true)
+    frontPage.AddItem(info, 0, 2, false)
 	mainContainer.SetDirection(tview.FlexRow).SetFullScreen(true)
 	mainContainer.AddItem(pages, 0, 107, true)    //AddItem(item Primitive, fixedSize, proportion int, focus bool)
 	mainContainer.AddItem(statusBar, 0, 1, false) // 107:1 seems fair ?
-	pages.EAddPage("Services", tree, true, true)  // EAddPage(name string, item tview.Primitive, resize, visible bool)
+	pages.EAddPage("Services", frontPage, true, true)  // EAddPage(name string, item tview.Primitive, resize, visible bool)
     statusBar.SetText("Welcome to the terminal interface for AWS. Type '?' to get help")
 	if err := app.SetRoot(mainContainer, true).SetFocus(mainContainer).Run(); err != nil {
 		panic(err)

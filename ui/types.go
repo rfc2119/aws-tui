@@ -109,7 +109,35 @@ func (p *ePages) GetCurrentPageName() string {
 }
 
 
+// TODO: this is a copy pasta from eGrid
+// =================================
+// eFlex definition and methods
+type eFlex struct {
+    *tview.Flex
+	Members              []tview.Primitive // equivalent to the unexported member 'items' in tview.Grid
+	CurrentMemberInFocus int               // index of the current member that has focus
+	HelpMessage          string
+	parent               *ePages // parent is used to display help message and navigate back to previous page (TODO: maybe the flex can do this itself ?)
+}
 
+func NewEFlex(parentPages *ePages) *eFlex {
+	f := eFlex{
+		Flex:                 tview.NewFlex(),
+		Members:              []tview.Primitive{},
+		CurrentMemberInFocus: 0,
+		HelpMessage:          "NO HELP MESSAGE (maybe submit a pull request ?)",
+		parent:               parentPages,
+	}
+	return &f
+}
+func (f *eFlex) EAddItem(p tview.Primitive, fixedSize, proportion int, focus bool) *eFlex{
+	f.AddItem(p, fixedSize, proportion, focus)
+	f.Members = append(f.Members, p)
+	return f
+}
+func (f *eFlex) DisplayHelp() {
+	f.parent.DisplayHelpMessage(f.HelpMessage)
+}
 // ==================================
 // eGrid definition and methods
 type eGrid struct {
