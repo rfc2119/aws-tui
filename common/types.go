@@ -31,6 +31,15 @@ const (
 	FILTER_CLIENT_TOKEN
 	FILTER_DESCRIPTION
 	FILTER_DNS_NAME
+    FILTER_EGRESS_IP_PERMISSION_CIDR
+    FILTER_EGRESS_IP_PERMISSION_FROM_PORT
+    FILTER_EGRESS_IP_PERMISSION_GROUP_ID
+    FILTER_EGRESS_IP_PERMISSION_GROUP_NAME
+    FILTER_EGRESS_IP_PERMISSION_IPV6_CIDR
+    FILTER_EGRESS_IP_PERMISSION_PREFIX_LIST_ID
+    FILTER_EGRESS_IP_PERMISSION_PROTOCOL
+    FILTER_EGRESS_IP_PERMISSION_TO_PORT
+    FILTER_EGRESS_IP_PERMISSION_USER_ID
 	FILTER_ENA_SUPPORT
 	FILTER_GROUP_ID
 	FILTER_GROUP_NAME
@@ -48,6 +57,15 @@ const (
 	FILTER_INSTANCE_GROUP_ID
 	FILTER_INSTANCE_GROUP_NAME
 	FILTER_IP_ADDRESS
+    FILTER_IP_PERMISSION_CIDR
+    FILTER_IP_PERMISSION_FROM_PORT
+    FILTER_IP_PERMISSION_GROUP_ID
+    FILTER_IP_PERMISSION_GROUP_NAME
+    FILTER_IP_PERMISSION_IPV6_CIDR
+    FILTER_IP_PERMISSION_PREFIX_LIST_ID
+    FILTER_IP_PERMISSION_PROTOCOL
+    FILTER_IP_PERMISSION_TO_PORT
+    FILTER_IP_PERMISSION_USER_ID
 	FILTER_IS_PUBLIC
 	FILTER_KERNEL_ID
 	FILTER_KEY_NAME
@@ -137,6 +155,15 @@ var FilterNames = map[int][]string{
 	FILTER_CLIENT_TOKEN:                                        []string{"client-token"},
 	FILTER_DESCRIPTION:                                         []string{"description"},
 	FILTER_DNS_NAME:                                            []string{"dns-name"},
+    FILTER_EGRESS_IP_PERMISSION_CIDR: []string{"egress.ip-permission.cidr"},
+    FILTER_EGRESS_IP_PERMISSION_FROM_PORT: []string{"egress.ip-permission.from-port"},
+    FILTER_EGRESS_IP_PERMISSION_GROUP_ID: []string{"egress.ip-permission.group-id"},
+    FILTER_EGRESS_IP_PERMISSION_GROUP_NAME: []string{"egress.ip-permission.group-name"},
+    FILTER_EGRESS_IP_PERMISSION_IPV6_CIDR: []string{"egress.ip-permission.ipv6-cidr"},
+    FILTER_EGRESS_IP_PERMISSION_PREFIX_LIST_ID: []string{"egress.ip-permission.prefix-list-id"},
+    FILTER_EGRESS_IP_PERMISSION_PROTOCOL: []string{"egress.ip-permission.protocol","tcp","icmp","udp"},
+    FILTER_EGRESS_IP_PERMISSION_TO_PORT: []string{"egress.ip-permission.to-port"},
+    FILTER_EGRESS_IP_PERMISSION_USER_ID: []string{"egress.ip-permission.user-id"},
 	FILTER_ENA_SUPPORT:                                         []string{"ena-support"},
 	FILTER_GROUP_ID:                                            []string{"group-id"},
 	FILTER_GROUP_NAME:                                          []string{"group-name"},
@@ -154,6 +181,15 @@ var FilterNames = map[int][]string{
 	FILTER_INSTANCE_GROUP_ID:                                   []string{"instance.group-id"},
 	FILTER_INSTANCE_GROUP_NAME:                                 []string{"instance.group-name"},
 	FILTER_IP_ADDRESS:                                          []string{"ip-address"},
+    FILTER_IP_PERMISSION_CIDR: []string{"ip-permission.cidr"},
+    FILTER_IP_PERMISSION_FROM_PORT: []string{"ip-permission.from-port"},
+    FILTER_IP_PERMISSION_GROUP_ID: []string{"ip-permission.group-id"},
+    FILTER_IP_PERMISSION_GROUP_NAME: []string{"ip-permission.group-name"},
+    FILTER_IP_PERMISSION_IPV6_CIDR: []string{"ip-permission.ipv6-cidr"},
+    FILTER_IP_PERMISSION_PREFIX_LIST_ID: []string{"ip-permission.prefix-list-id"},
+    FILTER_IP_PERMISSION_PROTOCOL: []string{"ip-permission.protocol","tcp","icmp","udp"},
+    FILTER_IP_PERMISSION_TO_PORT: []string{"ip-permission.to-port"},
+    FILTER_IP_PERMISSION_USER_ID: []string{"ip-permission.user-id"},
 	FILTER_IS_PUBLIC:                                           []string{"is-public"},
 	FILTER_KERNEL_ID:                                           []string{"kernel-id"},
 	FILTER_KEY_NAME:                                            []string{"key-name"},

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+    "github.com/aws/aws-sdk-go-v2/aws/awserr"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 )
 
@@ -31,18 +32,19 @@ func NewEC2Model(config aws.Config) *EC2Model {
 	}
 }
 
-func (mdl *EC2Model) GetEC2Instances() []ec2.Reservation {
+func (mdl *EC2Model) GetEC2Instances() []ec2.Instance {
 
-	req := mdl.model.DescribeInstancesRequest(&ec2.DescribeInstancesInput{})
-	resp, err := req.Send(context.Background()) // the background context is never canceled
-	if err != nil {                             // TODO: recover, as this get us a segfault when request fails (maybe return an empty reservation ?)
-		log.Println(err)
-	}
-	// fmt.Printf("%T:%#v", resp, resp)
-	// spew.Dump(resp.Reservations[0].Instances[0].ImageId)
-	// fmt.Println(resp.Reservations)
-	// spew.Dump(resp.Reservations)
-	return resp.Reservations // TODO: nextToken and maxNumber if n instances is huge (use pagination)
+    req := mdl.model.DescribeInstancesRequest(&ec2.DescribeInstancesInput{})
+    paginator := ec2.NewDescribeInstancesPaginator(req)
+    var instances []ec2.Instance
+    for paginator.Next(context.TODO()){
+        for _, reservation := range paginator.CurrentPage().Reservations {
+            instances = append(instances, reservation.Instances...)
+        }
+    }
+
+    printAWSError(paginator.Err())      // TODO: graceful error handling
+	return instances
 }
 
 // lists all instance types offered
@@ -66,13 +68,26 @@ func (mdl *EC2Model) ListAMIs(filterMap map[string]string) []ec2.Image {
 	}
 	req := mdl.model.DescribeImagesRequest(&ec2.DescribeImagesInput{Filters: filters})
 	resp, err := req.Send(context.TODO())
-	if err != nil { // TODO: graceful error handling
-		log.Println(err)
-	}
+    printAWSError(err)      // TODO: graceful error handling
 
 	return resp.Images
 }
 
+func printAWSError(err error) error {
+    if err != nil {
+        if aerr, ok := err.(awserr.Error); ok {
+            switch aerr.Code() {                    // TODO
+            default:
+                log.Println(aerr.Error())
+            }
+        } else {
+        // Print the error, cast err to awserr.Error to get the Code and
+        // Message from an error.
+        log.Println(err.Error())
+        }
+    }
+    return err
+}
 // DispatchWatchers sets the appropriate timer and calls each watcher
 func (mdl *EC2Model) DispatchWatchers() {
 	ticker := time.NewTicker(5 * time.Second) // TODO: 5
@@ -95,9 +110,7 @@ func watcher1(client *ec2.Client, ch chan<- common.Action, describeAll bool) {
 		IncludeAllInstances: &describeAll,
 	})
 	resp, err := req.Send(context.TODO())
-	if err != nil {
-		log.Println(err)
-	}
+    printAWSError(err)      // TODO: graceful error handling
 	sendMe := common.Action{Type: common.ACTION_INSTANCE_STATUS_UPDATE, Data: common.InstanceStatusesUpdate(resp.InstanceStatuses)} // TODO: paginator
 	ch <- sendMe
 }

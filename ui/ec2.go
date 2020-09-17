@@ -52,7 +52,7 @@ type ec2Service struct {
 	// logger log.Logger
 
 	// service specific data
-	reservations []ec2.Reservation // TODO: should be []ec2.Instance
+	instances []ec2.Instance
 }
 
 // config: the aws client config that will create the service (the underlying model)
@@ -75,7 +75,7 @@ func NewEC2Service(config aws.Config, app *tview.Application, rootPage *ePages, 
 			StatusBar: statBar,
 		},
 		Model:        model.NewEC2Model(config),
-		reservations: nil,
+		instances: nil,
 	}
 }
 
@@ -93,6 +93,7 @@ func (ec2svc *ec2Service) InitView() {
 	ec2svc.StatusBar.SetText("Status")
 
 	table.SetBorders(false)
+    table.SetBorderAttributes(tcell.AttrBold)
 	table.SetSelectable(true, false) // rows: true, colums: false means select only rows
 	table.Select(1, 1)
 	table.SetFixed(0, 3)
@@ -104,9 +105,6 @@ func (ec2svc *ec2Service) InitView() {
 	// grid.EAddItem(StatusBar, 40, 0, 1, 1, 0, 0, false) // AddItem(p Primitive, row, column, rowSpan, colSpan, minGridHeight, minGridWidth int, focus bool)
 
 	instanceStatusRadioButton.SetBorder(true).SetTitle("Status")
-	instanceStatusRadioButton.DisableOptionByIdx(1)
-	instanceStatusRadioButton.DisableOptionByIdx(2)
-	instanceStatusRadioButton.DisableOptionByIdx(3)
 	instanceOfferingsDropdown.SetLabel("Type")
 	gridEdit.HelpMessage = HELP_EC2_EDIT_INSTANCE
 	gridEdit.SetSize(2, 4, 0, 0) // SetSize(numRows, numColumns, rowSize, columnSize int)
@@ -143,7 +141,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 		switch event.Rune() {
 		case 'd':
 			row, _ := table.GetSelection()
-			description.SetText(fmt.Sprintf("%v", ec2svc.reservations[row-1].Instances[0]))
+			description.SetText(fmt.Sprintf("%v", ec2svc.instances[row-1]))
 		case 'e':
 			ec2svc.RootPage.ESwitchToPage("Edit Instance") // TODO: page names and such
 		case 'r':
@@ -154,6 +152,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 		return event
 	})
 
+    // TODO: unify grids
 	// main grid
 	grid.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
@@ -183,6 +182,8 @@ func (ec2svc *ec2Service) setCallbacks() {
 
 		case tcell.KeyRune:
 			switch event.Rune() {
+            case 'e':
+                ec2svc.StatusBar.SetText("E FROM GRID")
 			case '?':
 				grid.DisplayHelp()
 			case 'q':
@@ -313,6 +314,7 @@ func (ec2svc *ec2Service) chooseAMIFilters() {
 			}
 		}
 		tableAMI.SetBorders(true)
+        tableAMI.SetBorderAttributes(tcell.AttrBold)
 		tableAMI.SetSelectable(true, false) // rows: true, colums: false means select only rows
 		tableAMI.Select(1, 1)
 		tableAMI.SetFixed(1, 1)
@@ -365,17 +367,17 @@ func (ec2svc *ec2Service) showConfirmationBox(msg string) string {
 func (ec2svc *ec2Service) fillMainTable() {
 
 	colNames := []string{"ID", "AMI", "Type", "State", "StateReason"} // TODO
-	ec2svc.reservations = ec2svc.Model.GetEC2Instances()              // directly invokes a method on the model
+	ec2svc.instances = ec2svc.Model.GetEC2Instances()              // directly invokes a method on the model
 	for halpIdx := 0; halpIdx < len(colNames); halpIdx++ {
 		table.SetCell(0, halpIdx,
 			tview.NewTableCell(colNames[halpIdx]).SetAlign(tview.AlignCenter).SetSelectable(false))
 	}
-	for rowIdx, reservation := range ec2svc.reservations {
-		instanceIdCell := tview.NewTableCell(aws.StringValue(reservation.Instances[0].InstanceId))
-		instanceAMICell := tview.NewTableCell(*reservation.Instances[0].ImageId)
-		instanceTypeCell := tview.NewTableCell(string(reservation.Instances[0].InstanceType))
-		instanceStateCell := tview.NewTableCell(string(reservation.Instances[0].State.Name))
-		instanceStateReasonCell := tview.NewTableCell(*reservation.Instances[0].StateReason.Message)
+	for rowIdx, instance := range ec2svc.instances {
+		instanceIdCell := tview.NewTableCell(aws.StringValue(instance.InstanceId))
+		instanceAMICell := tview.NewTableCell(*instance.ImageId)
+		instanceTypeCell := tview.NewTableCell(string(instance.InstanceType))
+		instanceStateCell := tview.NewTableCell(string(instance.State.Name))
+		instanceStateReasonCell := tview.NewTableCell(*instance.StateReason.Message)
 		cells := []*tview.TableCell{instanceIdCell, instanceAMICell, instanceTypeCell, instanceStateCell, instanceStateReasonCell}
 		for colIdx, cell := range cells {
 			table.SetCell(rowIdx+1, colIdx, cell)
