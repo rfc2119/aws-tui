@@ -9,10 +9,9 @@ import (
 	// "github.com/gdamore/tcell"
 	"github.com/rivo/tview"
 	"github.com/aws/aws-sdk-go-v2/aws/external"
+	"github.com/aws/aws-sdk-go-v2/aws"
 )
 
-// TODO: information about region, IAM user, sdk version used, current build version, ... etc.
-// TODO: available services
 
 func main() {
 
@@ -32,7 +31,7 @@ func main() {
 
 	// services
 	ec2svc := ui.NewEC2Service(config, app, pages, statusBar)
-	ec2svc.InitView()
+    ec2svc.InitView()       // TODO: call only when user selects the service
     iamsvc := ui.NewIAMService(config, app, pages, statusBar)
 
 	// ui elements
@@ -43,32 +42,23 @@ func main() {
 
 	// filling the tree with initial values
 	rootNode := tview.NewTreeNode("Services")
-	var topLevelNodesNames []string
-	for _, name := range common.ServiceNames {
-		topLevelNodesNames = append(topLevelNodesNames, name)
+	for service, name := range common.ServiceNames {
+        if common.AvailableServices[service] {
+            nodeLevel1 := tview.NewTreeNode(name)
+            for _, subItemName := range common.ServiceChildrenNames[service] {
+                nodeLevel2 := tview.NewTreeNode(subItemName)
+                nodeLevel1.AddChild(nodeLevel2)
+                // _tmpChild.SetExpanded(false)
+            }
+            nodeLevel1.Collapse()
+            rootNode.AddChild(nodeLevel1)
+        }
 	}
-	levelInstances := []string{"Instances"}
-	levelEBS := []string{"Volumes"}
-	// var topLevelNodes []*tview.TreeNode
-	levelOne := [][]string{levelInstances, levelEBS}
 
-	// add levelX to top level nodes
-	for idx, node := range topLevelNodesNames {
-		_tmp := tview.NewTreeNode(node)
-		// topLevelNodes = append(topLevelNodes, _tmp)
-		for _, child := range levelOne[idx] {
-			_tmpChild := tview.NewTreeNode(child)
-			_tmp.AddChild(_tmpChild)
-			// _tmpChild.SetExpanded(false)
-		}
-		_tmp.Collapse()
-		rootNode.AddChild(_tmp)
-	}
 	tree.SetSelectedFunc(func(node *tview.TreeNode) {
 		children := node.GetChildren()
 		if len(children) == 0 && pages.HasPage(node.GetText()) { // go to page
 			pages.ESwitchToPage(node.GetText())
-			// tview.NewModal().SetText("children").AddButtons([]string{"ok"})
 
 		} else {
 			node.SetExpanded(!node.IsExpanded())
@@ -84,8 +74,9 @@ func main() {
     Region:        %7s
 
     Build Version: HALP
-    SDK Version:   Go SDK V2
-    `, *currentIAMUser.UserName, *currentIAMUser.Arn, config.Region)
+    SDK Name:      %7s
+    SDK Version:   %-7s
+    `, *currentIAMUser.UserName, *currentIAMUser.Arn, config.Region, aws.SDKName, aws.SDKVersion)
 
 	// ui config
 	tree.SetRoot(rootNode)

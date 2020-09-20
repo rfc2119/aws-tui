@@ -16,7 +16,6 @@ import (
 // this might break in the future. sometimes, multiple benefeciaries exist for a single work. for example, when deleting an ebs volume, the ec2 console should also make use of the deletion command/action to update the affected instance. i don't know how to approach this (yet)
 type EC2Model struct {
 	model *ec2.Client
-	// watchers []watcher		// any watcher should register itself here; a watcher is a routine that polls for changes from the model
 	Channel chan common.Action // channel from model to view (see above)
 	Name    string             // use the convenient map to assign the correct name
 	// logger	log.Logger
@@ -31,6 +30,45 @@ func NewEC2Model(config aws.Config) *EC2Model {
 	}
 }
 
+func (mdl *EC2Model) StartEC2Instance(instanceIds []string) []ec2.InstanceStateChange{
+
+	req := mdl.model.StartInstancesRequest(&ec2.StartInstancesInput{
+        InstanceIds: instanceIds,
+    })
+	resp, err := req.Send(context.TODO())
+    printAWSError(err)      // TODO: graceful error handling
+	// return resp.InstanceTypeOfferings // TODO: paginator
+    return resp.StartingInstances
+}
+
+func (mdl *EC2Model) StopEC2Instance(instanceIds []string, force, hibernate bool)[]ec2.InstanceStateChange {
+	req := mdl.model.StopInstancesRequest(&ec2.StopInstancesInput{
+        InstanceIds: instanceIds,
+        Hibernate: aws.Bool(hibernate),
+        Force: aws.Bool(force),
+    })
+	resp, err := req.Send(context.TODO())
+    printAWSError(err)      // TODO: graceful error handling
+	// return resp.InstanceTypeOfferings // TODO: paginator
+    return resp.StoppingInstances
+
+}
+func (mdl *EC2Model) RebootEC2Instance(instanceIds []string){
+	req := mdl.model.RebootInstancesRequest(&ec2.RebootInstancesInput{
+        InstanceIds: instanceIds,
+    })
+	_, err := req.Send(context.TODO())
+    printAWSError(err)      // TODO: graceful error handling
+}
+func (mdl *EC2Model) TerminateEC2Instance(instanceIds []string) []ec2.InstanceStateChange {
+
+	req := mdl.model.TerminateInstancesRequest(&ec2.TerminateInstancesInput{
+        InstanceIds: instanceIds,
+    })
+	resp, err := req.Send(context.TODO())
+    printAWSError(err)      // TODO: graceful error handling
+    return resp.TerminatingInstances
+}
 func (mdl *EC2Model) GetEC2Instances() []ec2.Instance {
 
     req := mdl.model.DescribeInstancesRequest(&ec2.DescribeInstancesInput{})
@@ -72,10 +110,24 @@ func (mdl *EC2Model) ListAMIs(filterMap map[string]string) []ec2.Image {
 	return resp.Images
 }
 
+func (mdl *EC2Model) ListVolumes() []ec2.Volume {
+	var (
+        volumes []ec2.Volume
+    )
+	req := mdl.model.DescribeVolumesRequest(&ec2.DescribeVolumesInput{})
+    paginator := ec2.NewDescribeVolumesPaginator(req)
+    for paginator.Next(context.TODO()){
+        volumes = append(volumes, paginator.CurrentPage().Volumes...)
+    }
+
+    printAWSError(paginator.Err())      // TODO: graceful error handling
+	return volumes
+}
+// TODO: i don't understand why this is better than a simple print
 func printAWSError(err error) error {
     if err != nil {
         if aerr, ok := err.(awserr.Error); ok {
-            switch aerr.Code() {                    // TODO
+            switch aerr.Code() {
             default:
                 log.Println(aerr.Error())
             }
@@ -100,8 +152,7 @@ func (mdl *EC2Model) DispatchWatchers() {
 	}(ticker, mdl.Channel, mdl.model)
 }
 
-// What the duck ? DescribeInstanceStatus (the API itself) requires that an instance be in the running state
-// TODO: not sure this is the best way to do this
+// TODO: not sure this is the best way to do this watcher/listner combo
 func watcher1(client *ec2.Client, ch chan<- common.Action, describeAll bool) {
 	// mdl.watchers = append(mdl.watchers, watcher)
 
@@ -113,8 +164,3 @@ func watcher1(client *ec2.Client, ch chan<- common.Action, describeAll bool) {
 	sendMe := common.Action{Type: common.ACTION_INSTANCE_STATUS_UPDATE, Data: common.InstanceStatusesUpdate(resp.InstanceStatuses)} // TODO: paginator
 	ch <- sendMe
 }
-
-// type watcher interface{
-// 	register(mdl *EC2Model)		// watcher registers self in a model instance
-// 	run()				// go watch
-// }

@@ -2,13 +2,14 @@ package ui
 
 import (
 	"fmt"
-	// "log"
+    "reflect"
 	"time"
 
-	// "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/gdamore/tcell"
 	"github.com/rivo/tview"
 )
+
 
 // type viewComponent struct {
 // 	ID      string           // unique id for the component; assigned as the address of the actual ui element
@@ -290,4 +291,32 @@ func (bar *StatusBar) InputHandler() func(event *tcell.EventKey, setFocus func(p
 
 func (bar *StatusBar) Focus(delegate func(p tview.Primitive)) {
 	bar.Blur()
+}
+
+
+// helper functions
+// quite silly function (TODO: probably refactor)
+func stringFromAWSVar(awsVar interface{}) string {
+    var t string
+    switch v := awsVar.(type){
+    case *string:
+        t = aws.StringValue(v)
+    case *int:
+        t = fmt.Sprint(aws.IntValue(v))      // hmmmm
+    case *int64:
+        // go vet being helpful as always:
+        // conversion from int to string yields a string of one rune, 
+        // not a string of digits (did you mean fmt.Sprint(x)?)
+        t = fmt.Sprint(aws.Int64Value(v))      // hmmmm
+    default:
+        switch reflect.TypeOf(v).Kind(){
+        case reflect.String:    // should be a type derived from string ?
+            t = reflect.ValueOf(v).String()
+        case reflect.Int, reflect.Int64:
+            t = fmt.Sprint(reflect.ValueOf(v).Int())
+        default:
+            t = ""
+        }
+    }
+    return t
 }

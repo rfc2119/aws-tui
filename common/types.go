@@ -15,7 +15,7 @@ const (
 	// defining the services themselves as numeric constants
 	// might be useful some time in the future
 	SERVICE_EC2
-	SERVICE_EBS
+    SERVICE_IAM
 
 	// filters
 	FILTER_AFFINITY
@@ -136,8 +136,19 @@ const (
 // convenient maps *shrugs*
 // map to unify service names
 var ServiceNames = map[int]string{
-	SERVICE_EC2: "ec2",
-	SERVICE_EBS: "ebs",
+	SERVICE_EC2: "ec2",             // plus EBS as well
+    SERVICE_IAM: "iam",
+}
+
+// map of subitems (tree children) names appearing at front page. this should be modeled as a tree object with children as tree nodes. this works for now
+var ServiceChildrenNames = map[int][]string{
+    SERVICE_EC2: []string{"Instances", "Volumes"},
+    SERVICE_IAM: []string{"TODO"},
+}
+
+var AvailableServices = map[int]bool{
+    SERVICE_EC2: true,
+    SERVICE_IAM: true,
 }
 
 // map of filter names and some of the default values
