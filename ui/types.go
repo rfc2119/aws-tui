@@ -250,6 +250,13 @@ func (r *RadioButtons) GetCurrentOptionName() string {
 	return r.options[r.currentOption].name
 }
 
+func (r *RadioButtons) GetOptions() []string {
+    opts := make([]string, len(r.options))
+	for idx, opt := range r.options {
+        opts[idx] = opt.name
+    }
+    return opts
+}
 func (r *RadioButtons) DisableOptionByName(name string) {
 	for _, opt := range r.options {
 		if opt.name == name {
@@ -263,6 +270,9 @@ func (r *RadioButtons) DisableOptionByIdx(idx int) {
 	r.options[idx].enabled = false
 }
 
+func (r *RadioButtons) EnableOptionByIdx(idx int) {
+	r.options[idx].enabled = true
+}
 // ====================
 // status bar
 type StatusBar struct {

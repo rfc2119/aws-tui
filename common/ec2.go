@@ -8,11 +8,12 @@ import (
 type stateMachine struct {
     ssm.StateMachine
     color   tcell.Color
+    emptyTrigger ssm.Trigger        // for state machines which have intermediate states
 }
 
-func (sm *stateMachine) GetColor() tcell.Color {
-    return sm.color
-}
+func (sm *stateMachine) GetColor() tcell.Color { return sm.color }
+func (sm *stateMachine) GetEmptyTrigger() ssm.Trigger { return sm.emptyTrigger }
+
 
 var (
     AMIFilters = []int{FILTER_ARCHITECTURE, FILTER_OWNER_ALIAS, FILTER_NAME, FILTER_PLATFORM, FILTER_ROOT_DEVICE_TYPE, FILTER_STATE}
@@ -31,9 +32,10 @@ func NewEC2InstancesStateMachine() *stateMachine {
     // reference: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-lifecycle.html
 
     // triggers (see ui/ec2 for trigger names)  TODO: unify trigger names
-    emptyTrigger := ssm.Trigger{Key: ""}
+    emptyTrigger := ssm.Trigger{Key: " "}       // transition to intermediate states
     startTrigger := ssm.Trigger{Key: "Start"}
     stopTrigger := ssm.Trigger{Key: "Stop"}
+    stopForceTrigger := ssm.Trigger{Key: "Stop (Force)"}
     hibernateTrigger := ssm.Trigger{Key: "Hibernate"}
     terminateTrigger := ssm.Trigger{Key: "Terminate"}
     rebootTrigger := ssm.Trigger{Key: "Reboot"}
@@ -42,6 +44,7 @@ func NewEC2InstancesStateMachine() *stateMachine {
     EC2LifeCycle := stateMachine{
         StateMachine: *ssm.NewStateMachine(pendingState),
         color: tcell.ColorDefault,
+        emptyTrigger: emptyTrigger,          // if there's no trigger defined, set trigger.Key to ""
     }
     runningConfig := EC2LifeCycle.Configure(runningState)
     stoppedConfig := EC2LifeCycle.Configure(stoppedState)
@@ -55,6 +58,7 @@ func NewEC2InstancesStateMachine() *stateMachine {
     runningConfig.Permit(terminateTrigger, shuttingDownState)
     runningConfig.Permit(rebootTrigger, rebootingState)
     runningConfig.Permit(stopTrigger, stoppingState)
+    runningConfig.Permit(stopForceTrigger, stoppingState)
     runningConfig.Permit(hibernateTrigger, stoppingState)
 
     // configuring the running state

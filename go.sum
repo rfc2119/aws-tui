@@ -39,6 +39,10 @@ github.com/rfc2119/simple-state-machine v0.0.0-20200920083032-0b24e47381e3 h1:CH
 github.com/rfc2119/simple-state-machine v0.0.0-20200920083032-0b24e47381e3/go.mod h1:iVxw0PitG1HTQo+zUriP+ZHF4h4N9jg+6GcMDvDi+yE=
 github.com/rfc2119/simple-state-machine v0.0.0-20200920144502-5f3ac80ba319 h1:D5bAVZmmp/sj0MVoH6UaZWxuOkOJt/OM8liwGc/4UuA=
 github.com/rfc2119/simple-state-machine v0.0.0-20200920144502-5f3ac80ba319/go.mod h1:iVxw0PitG1HTQo+zUriP+ZHF4h4N9jg+6GcMDvDi+yE=
+github.com/rfc2119/simple-state-machine v0.0.0-20200920202540-d1566ad81364 h1:hFIiEbvanJ/MiiLSUb/fqNwvKUDtAXjS94ntlqMC1QI=
+github.com/rfc2119/simple-state-machine v0.0.0-20200920202540-d1566ad81364/go.mod h1:iVxw0PitG1HTQo+zUriP+ZHF4h4N9jg+6GcMDvDi+yE=
+github.com/rfc2119/simple-state-machine v0.0.0-20200921151301-9684ead3565f h1:fQt9eXsEB7wjUg0Q87i4j5vBktDZAiaRWQOu9KhETDg=
+github.com/rfc2119/simple-state-machine v0.0.0-20200921151301-9684ead3565f/go.mod h1:iVxw0PitG1HTQo+zUriP+ZHF4h4N9jg+6GcMDvDi+yE=
 github.com/rivo/tview v0.0.0-20200818120338-53d50e499bf9 h1:csnip7QsoiE2Ee0RkELN1YggwejK2EFfcjU6tXOT0Q8=
 github.com/rivo/tview v0.0.0-20200818120338-53d50e499bf9/go.mod h1:xV4Aw4WIX8cmhg71U7MUHBdpIQ7zSEXdRruGHLaEAOc=
 github.com/rivo/tview v0.0.0-20200915114512-42866ecf6ca6 h1:LhmHZTzElCYlOXEWXWOQXy/vgjPsdiDb7LzHV8mTKvI=
