@@ -36,10 +36,41 @@ type mainUI struct {
 // as usual, types.go contains some type definitions and configs
 // exported methods of names similar to the original ui elements (from tview package) are prefixed with the vowel 'E' (capital E) for no reason. similarily, 'e' prefixes the custom ui elements defined
 
+type inputCapturer struct {
+    // setKeyToFunc(p tview.Primitive, keyToFunc map[tcell.Key]func()){
+    keyToFunc map[tcell.Key]func()
+}
+
+func (i *inputCapturer) UpdateKeyToFunc(keyToF map[tcell.Key]func()){
+    for k, v := range keyToF {
+        i.keyToFunc[k] = v
+    }
+}
+// TODO: generalize
+// uses SetInputCapture on primitive
+// func (i *inputCapturer) setKeyToFunc(ifce interface{}){
+//     switch b := ifce.(type){
+//     case *eFlex, *eGrid, *eTable, *radioButton:
+//         b.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+//             uKey := event.Key()
+//             if event.Rune() != 0 {
+//                 uKey = tcell.Key(event.Rune())
+//             }
+//             for k, f := range i.keyToFunc{
+//                 if k == uKey {
+//                     f()
+//                     break
+//                 }
+//             }
+//             return event
+//         })
+//     }
+// }
 // =================================
 // ePages definition and methods
 type ePages struct {
 	*tview.Pages
+    *inputCapturer
 	HelpMessage string
 	pageStack   []string // used for moving backwards one page at a time
 }
@@ -48,10 +79,33 @@ func NewEPages() *ePages {
 	p := ePages{
 		Pages:     tview.NewPages(),
 		pageStack: []string{},
-	}
+		HelpMessage:          "NO HELP MESSAGE (maybe submit a pull request ?)",
+        inputCapturer: &inputCapturer{ keyToFunc: make(map[tcell.Key]func()) },
+    }
+    // p.inputCapturer.UpdateKeyToFunc(map[tcell.Key]func(){
+    //     tcell.Key('?'): func(){ p.DisplayHelpMessage(p.HelpMessage)},
+    //     tcell.Key('q'): func(){ p.ESwitchToPreviousPage() },
+    // })
+    p.setKeyToFunc()
 	return &p
 }
 
+
+func (p *ePages) setKeyToFunc(){        // TODO: see repeated method on other types
+        p.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+            uKey := event.Key()
+            if event.Rune() != 0 {
+                uKey = tcell.Key(event.Rune())
+            }
+            for k, f := range p.keyToFunc{
+                if k == uKey {
+                    f()
+                    break
+                }
+            }
+            return event
+        })
+    }
 // same as AddPage
 func (p *ePages) EAddPage(name string, item tview.Primitive, resize, visible bool) *ePages {
 	p.AddPage(name, item, resize, visible)
@@ -115,6 +169,7 @@ func (p *ePages) GetCurrentPageName() string {
 // eFlex definition and methods
 type eFlex struct {
     *tview.Flex
+    *inputCapturer
 	Members              []tview.Primitive // equivalent to the unexported member 'items' in tview.Grid
 	CurrentMemberInFocus int               // index of the current member that has focus
 	HelpMessage          string
@@ -128,7 +183,13 @@ func NewEFlex(parentPages *ePages) *eFlex {
 		CurrentMemberInFocus: 0,
 		HelpMessage:          "NO HELP MESSAGE (maybe submit a pull request ?)",
 		parent:               parentPages,
+        inputCapturer: &inputCapturer{ keyToFunc: make(map[tcell.Key]func()) },
 	}
+    f.inputCapturer.UpdateKeyToFunc(map[tcell.Key]func(){
+        tcell.Key('?'): func(){ f.DisplayHelp()},
+        tcell.Key('q'): func(){ f.parent.ESwitchToPreviousPage() },
+    })
+    f.setKeyToFunc()
 	return &f
 }
 func (f *eFlex) EAddItem(p tview.Primitive, fixedSize, proportion int, focus bool) *eFlex{
@@ -139,10 +200,26 @@ func (f *eFlex) EAddItem(p tview.Primitive, fixedSize, proportion int, focus boo
 func (f *eFlex) DisplayHelp() {
 	f.parent.DisplayHelpMessage(f.HelpMessage)
 }
+func (f *eFlex) setKeyToFunc(){        // TODO: see repeated method on other types
+        f.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+            uKey := event.Key()
+            if event.Rune() != 0 {
+                uKey = tcell.Key(event.Rune())
+            }
+            for k, f := range f.keyToFunc{
+                if k == uKey {
+                    f()
+                    break
+                }
+            }
+            return event
+        })
+    }
 // ==================================
 // eGrid definition and methods
 type eGrid struct {
 	*tview.Grid
+    *inputCapturer
 	Members              []tview.Primitive // equivalent to the unexported member 'items' in tview.Grid
 	CurrentMemberInFocus int               // index of the current member that has focus
 	HelpMessage          string
@@ -156,7 +233,13 @@ func NewEgrid(parentPages *ePages) *eGrid {
 		CurrentMemberInFocus: 0,
 		HelpMessage:          "NO HELP MESSAGE (maybe submit a pull request ?)",
 		parent:               parentPages,
+        inputCapturer: &inputCapturer{ keyToFunc: make(map[tcell.Key]func()) },
 	}
+    g.inputCapturer.UpdateKeyToFunc(map[tcell.Key]func(){
+        tcell.Key('?'): func(){ g.DisplayHelp()},
+        tcell.Key('q'): func(){ g.parent.ESwitchToPreviousPage() },
+    })
+    g.setKeyToFunc()
 	return &g
 }
 func (g *eGrid) EAddItem(p tview.Primitive, row, column, rowSpan, colSpan, minGridHeight, minGridWidth int, focus bool) *eGrid {
@@ -170,33 +253,82 @@ func (g *eGrid) DisplayHelp() {
 	g.parent.DisplayHelpMessage(g.HelpMessage)
 }
 
+func (g *eGrid) setKeyToFunc(){        // TODO: see repeated method on other types
+        g.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+            uKey := event.Key()
+            if event.Rune() != 0 {
+                uKey = tcell.Key(event.Rune())
+            }
+            for k, f := range g.keyToFunc{
+                if k == uKey {
+                    f()
+                    break
+                }
+            }
+            return event
+        })
+    }
+
+// eTable definition and methods
+type eTable struct {
+	*tview.Table
+    *inputCapturer
+}
+
+func NewEtable() *eTable {
+	t := eTable{
+		Table:                 tview.NewTable(),
+        inputCapturer: &inputCapturer{ keyToFunc: make(map[tcell.Key]func()) },
+	}
+    t.setKeyToFunc()
+	return &t
+}
+func (t *eTable) setKeyToFunc(){        // TODO: see repeated method on other types
+        t.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+            uKey := event.Key()
+            if event.Rune() != 0 {
+                uKey = tcell.Key(event.Rune())
+            }
+            for k, f := range t.keyToFunc{
+                if k == uKey {
+                    f()
+                    break
+                }
+            }
+            return event
+        })
+    }
 // =============================
 // radio button primitive. copied from the demo https://github.com/rivo/tview/blob/master/demos/primitive
 // RadioButtons implements a simple primitive for radio button selections.
-type RadioButtonOption struct {
+type radioButtonOption struct {
 	name    string
 	enabled bool
 }
-type RadioButtons struct {
+type radioButtons struct {
 	*tview.Box
-	options       []RadioButtonOption
+    *inputCapturer
+	options       []radioButtonOption
 	currentOption int // index of current selected option
 }
 
 // NewRadioButtons returns a new radio button primitive.
-func NewRadioButtons(optionNames []string) *RadioButtons {
-	options := make([]RadioButtonOption, len(optionNames))
+func NewRadioButtons(optionNames []string) *radioButtons {
+	options := make([]radioButtonOption, len(optionNames))
 	for idx, name := range optionNames {
-		options[idx] = RadioButtonOption{name, true} // default: all enabled
+		options[idx] = radioButtonOption{name, true} // default: all enabled
 	}
-	return &RadioButtons{
+    r := radioButtons{
 		Box:     tview.NewBox(),
 		options: options,
+        inputCapturer: &inputCapturer{ keyToFunc: make(map[tcell.Key]func()) },
 	}
+    r.setKeyToFunc()
+    return &r
 }
 
 // Draw draws this primitive onto the screen.
-func (r *RadioButtons) Draw(screen tcell.Screen) {
+func (r *radioButtons) Draw(screen tcell.Screen) {
 	r.Box.Draw(screen)
 	x, y, width, height := r.GetInnerRect()
 
@@ -218,7 +350,7 @@ func (r *RadioButtons) Draw(screen tcell.Screen) {
 }
 
 // InputHandler returns the handler for this primitive.
-func (r *RadioButtons) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+func (r *radioButtons) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
 	return r.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
 		switch {
 		case event.Key() == tcell.KeyUp, event.Rune() == 'k':
@@ -246,18 +378,18 @@ func (r *RadioButtons) InputHandler() func(event *tcell.EventKey, setFocus func(
 }
 
 // return the name of the current option
-func (r *RadioButtons) GetCurrentOptionName() string {
+func (r *radioButtons) GetCurrentOptionName() string {
 	return r.options[r.currentOption].name
 }
 
-func (r *RadioButtons) GetOptions() []string {
+func (r *radioButtons) GetOptions() []string {
     opts := make([]string, len(r.options))
 	for idx, opt := range r.options {
         opts[idx] = opt.name
     }
     return opts
 }
-func (r *RadioButtons) DisableOptionByName(name string) {
+func (r *radioButtons) DisableOptionByName(name string) {
 	for _, opt := range r.options {
 		if opt.name == name {
 			opt.enabled = false
@@ -266,13 +398,28 @@ func (r *RadioButtons) DisableOptionByName(name string) {
 	}
 }
 
-func (r *RadioButtons) DisableOptionByIdx(idx int) {
+func (r *radioButtons) DisableOptionByIdx(idx int) {
 	r.options[idx].enabled = false
 }
 
-func (r *RadioButtons) EnableOptionByIdx(idx int) {
+func (r *radioButtons) EnableOptionByIdx(idx int) {
 	r.options[idx].enabled = true
 }
+func (r *radioButtons) setKeyToFunc(){        // TODO: see repeated method on other types
+        r.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+            uKey := event.Key()
+            if event.Rune() != 0 {
+                uKey = tcell.Key(event.Rune())
+            }
+            for k, f := range r.keyToFunc{
+                if k == uKey {
+                    f()
+                    break
+                }
+            }
+            return event
+        })
+    }
 // ====================
 // status bar
 type StatusBar struct {
@@ -330,3 +477,26 @@ func stringFromAWSVar(awsVar interface{}) string {
     }
     return t
 }
+// TODO: initially i did this to avoid writing similar functions for the same keys. i think this should be more generalized. also, is this slower than a big jump table (i.e switch/case statement) ?
+// func setKeyToFunc(i interface{}){
+//     // TODO: unify into one type
+//     switch b := i.(type){
+//     case *eFlex, *eGrid, *eTabel, *RadioButtons:
+//     b.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+//         uKey := event.Key()
+//         if event.Rune() != 0 {
+//             uKey = tcell.Key(event.Rune())
+//         }
+//         for k, f := range b.keyToFunc{
+//             if k == uKey {
+//                 f()
+//                 break
+//             }
+//         }
+//         return event
+//     })
+// default:
+//     fmt.Println("NOT IMPLEMENTED")
+// }
+// 
+// }

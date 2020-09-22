@@ -58,8 +58,8 @@ const (
 var (
 	instancesFlex             *eFlex                // the main container
 	description               = tview.NewTextView() // instance description
-	instancesTable            = tview.NewTable()    // instance status as in web ui
-	volumesTable              = tview.NewTable()
+	instancesTable            = NewEtable()         // instance status as in web ui
+	volumesTable              = NewEtable()
 	volumesFlex               *eFlex
 	editVolumesGrid           *eGrid
 	editInstancesGrid         *eGrid
@@ -168,82 +168,57 @@ func (ec2svc *ec2Service) drawElements() {
 // set function callbacks for different ui elements
 func (ec2svc *ec2Service) setCallbacks() {
 
+	// common functions used throughout
+	funcShiftFocus := func(p tview.Primitive) {
+		// TODO: check if eFlex or eGrid
+		if len(instancesFlex.Members) > 0 {
+			instancesFlex.CurrentMemberInFocus++
+			if instancesFlex.CurrentMemberInFocus == len(instancesFlex.Members) { //  instancesFlex.CurrentMemberInFocus %= len(instancesFlex.Members)
+				instancesFlex.CurrentMemberInFocus = 0
+			}
+			ec2svc.MainApp.SetFocus(instancesFlex.Members[instancesFlex.CurrentMemberInFocus])
+
+		}
+	}
+
 	// main instancesTable
-	instancesTable.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		row, _ := instancesTable.GetSelection()
-		switch event.Rune() {
-		case 'd':
+	instancesTableCallbacks := map[tcell.Key]func(){
+		tcell.Key('d'): func() {
+			row, _ := instancesTable.GetSelection() // TODO: multi selection
 			description.SetText(fmt.Sprintf("%v", ec2svc.instances[row-1]))
-		case 'e':
+		},
+		tcell.Key('e'): func() {
 			// configuring the state radio button
+			row, _ := instancesTable.GetSelection() // TODO: multi selection
 			editInstanceStatusRadioButton(instancesTable.GetCell(row, COL_EC2_STATE).Text)
 			// TODO: configure the "instace type" drop down
 			editInstancesGrid.SetTitle(instancesTable.GetCell(row, COL_EC2_ID).Text)
 			ec2svc.RootPage.ESwitchToPage("Edit Instance") // TODO: page names and such
-		case 'r':
+		},
+		tcell.Key('r'): func() {
 			ec2svc.StatusBar.SetText("refreshing instances list")
 			ec2svc.fillInstancesTable()
-		}
-
-		return event
-	})
+		},
+	}
+	instancesTable.UpdateKeyToFunc(instancesTableCallbacks)
 
 	// TODO: unify grids
 	// main instancesFlex
-	instancesFlex.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		switch event.Key() {
-
-		case tcell.KeyTab:
-			if len(instancesFlex.Members) > 0 {
-				instancesFlex.CurrentMemberInFocus++
-				if instancesFlex.CurrentMemberInFocus == len(instancesFlex.Members) { //  instancesFlex.CurrentMemberInFocus %= len(instancesFlex.Members)
-					instancesFlex.CurrentMemberInFocus = 0
-				}
-				ec2svc.MainApp.SetFocus(instancesFlex.Members[instancesFlex.CurrentMemberInFocus])
-
-			}
-		case tcell.KeyCtrlL:
-			// build modal and let user choose AMI filters
-			ec2svc.chooseAMIFilters()
-
-		case tcell.KeyRune:
-			switch event.Rune() {
-			case '?':
-				instancesFlex.DisplayHelp()
-			case 'q':
-				ec2svc.RootPage.ESwitchToPreviousPage()
-				ec2svc.StatusBar.SetText("exit ec2")
-			}
-		}
-		return event
-	})
+	instancesFlexCallBacks := map[tcell.Key]func(){
+		tcell.KeyTab:   func() { funcShiftFocus(instancesFlex) },
+		tcell.KeyCtrlL: func() { ec2svc.chooseAMIFilters() },
+	}
+	instancesFlex.UpdateKeyToFunc(instancesFlexCallBacks)
 
 	// edit grid (TODO: copy pasta from above)
-	editInstancesGrid.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		// ec2svc.StatusBar.SetText(fmt.Sprintf("grid: %v. radio button: %v. dropdown: %v", editInstancesGrid.HasFocus(), instanceStatusRadioButton.HasFocus(), instanceOfferingsDropdown.HasFocus())) // TODO
-		switch event.Key() {
-		case tcell.KeyTab:
-			if len(editInstancesGrid.Members) > 0 {
-				editInstancesGrid.CurrentMemberInFocus++
-				if editInstancesGrid.CurrentMemberInFocus == len(editInstancesGrid.Members) { //  editInstancesGrid.CurrentMemberInFocus %= len(editInstancesGrid.Members)
-					editInstancesGrid.CurrentMemberInFocus = 0
-				}
-				ec2svc.MainApp.SetFocus(instancesFlex.Members[instancesFlex.CurrentMemberInFocus])
-			}
-		case tcell.KeyRune:
-			switch event.Rune() {
-			case '?':
-				editInstancesGrid.DisplayHelp()
-			case 'q':
-				ec2svc.RootPage.ESwitchToPreviousPage()
-			}
-		}
-		return event
-	})
+	editInstancesGridCallBacks := map[tcell.Key]func(){
+		tcell.KeyTab: func() { funcShiftFocus(editInstancesGrid) },
+	}
+	editInstancesGrid.UpdateKeyToFunc(editInstancesGridCallBacks)
 
 	// radio button
-	instanceStatusRadioButton.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyEnter || event.Rune() == ' ' {
+	instanceStatusRadioButtonCallBacks := map[tcell.Key]func(){
+		tcell.Key(' '): func() {
 			currOpt := instanceStatusRadioButton.GetCurrentOptionName()
 			msg := fmt.Sprintf("%s instance ?", currOpt)
 			ec2svc.showConfirmationBox(msg, func() {
@@ -266,9 +241,9 @@ func (ec2svc *ec2Service) setCallbacks() {
 					ec2svc.Model.TerminateEC2Instance(instanceIds)
 				}
 			})
-		}
-		return event
-	})
+		},
+	}
+	instanceStatusRadioButton.UpdateKeyToFunc(instanceStatusRadioButtonCallBacks)
 
 	// dropdown instance offering
 	instanceOfferingsDropdown.SetSelectedFunc(func(text string, index int) {
@@ -278,43 +253,17 @@ func (ec2svc *ec2Service) setCallbacks() {
 		// }
 	})
 
-	// volumes table
-	volumesTable.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		switch event.Rune() {
-		case 'e':
-			// ec2svc.RootPage.ESwitchToPage("Edit Volume") // TODO: page names and such
-			ec2svc.StatusBar.SetText("edit volume")
-			ec2svc.editVolumes()
-		case 'r':
-			ec2svc.StatusBar.SetText("refreshing volumes list")
-			ec2svc.fillVolumesTable()
-		}
+	volumesTableCallBacks := map[tcell.Key]func(){
+		tcell.Key('e'): func() { ec2svc.editVolumes() },
+		tcell.Key('r'): func() { ec2svc.fillVolumesTable() },
+	}
+	volumesTable.UpdateKeyToFunc(volumesTableCallBacks)
 
-		return event
-	})
-	volumesFlex.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		switch event.Key() {
-
-		case tcell.KeyTab:
-			if len(volumesFlex.Members) > 0 {
-				volumesFlex.CurrentMemberInFocus++
-				if volumesFlex.CurrentMemberInFocus == len(volumesFlex.Members) { //  volumesFlex.CurrentMemberInFocus %= len(volumesFlex.Members)
-					volumesFlex.CurrentMemberInFocus = 0
-				}
-				ec2svc.MainApp.SetFocus(volumesFlex.Members[volumesFlex.CurrentMemberInFocus])
-
-			}
-		case tcell.KeyRune:
-			switch event.Rune() {
-			case '?':
-				volumesFlex.DisplayHelp()
-			case 'q':
-				ec2svc.RootPage.ESwitchToPreviousPage()
-				ec2svc.StatusBar.SetText("exit ebs")
-			}
-		}
-		return event
-	})
+	// TODO: unify flexes
+	volumesFlexCallBacks := map[tcell.Key]func(){
+		tcell.KeyTab: func() { funcShiftFocus(volumesFlex) },
+	}
+	volumesFlex.UpdateKeyToFunc(volumesFlexCallBacks)
 }
 
 func (ec2svc *ec2Service) editVolumes() {
@@ -334,13 +283,14 @@ func (ec2svc *ec2Service) editVolumes() {
 	inputFieldVolumeIops.SetText(volumesTable.GetCell(row, COL_EBS_IOPS).Text)
 	inputFieldVolumeSize.SetText(volumesTable.GetCell(row, COL_EBS_SIZE).Text)
 	// dropDownVolumeType.SetIndex()       // TODO
-	grid.SetSize(50, 20, 0, 0)
-	grid.EAddItem(dropDownVolumeType, 0, 0, 1, 2, 0, 0, true) // row, col, rowSpan, colSpan, minGridHeight, minGridWidth, focus
-	grid.EAddItem(inputFieldVolumeSize, 1, 0, 1, 2, 0, 0, false)
-	grid.EAddItem(inputFieldVolumeSize, 2, 0, 1, 2, 0, 0, false)
-	grid.EAddItem(radioButtonVolumeStatus, 0, 2, 1, 2, 0, 0, false)
+	grid.SetSize(2, 2, 10, 20) // numRows, numCols, rowSize, colSize
+	// grid.SetColumns(50, 50)
+	grid.EAddItem(dropDownVolumeType, 0, 0, 1, 1, 0, 0, true) // row, col, rowSpan, colSpan, minGridHeight, minGridWidth, focus
+	grid.EAddItem(inputFieldVolumeSize, 1, 0, 1, 1, 0, 0, false)
+	grid.EAddItem(radioButtonVolumeStatus, 0, 1, 1, 1, 0, 0, false)
 	// editInstancesGrid.EAddItem(instanceStatusRadioButton, 0, 0, 1, 2, 0, 0, true)
-	ec2svc.showGenericModal(volumesTable.GetCell(row, COL_EBS_ID).Text, grid, 50, 20)
+	grid.SetBorders(true).SetTitle(volumesTable.GetCell(row, COL_EBS_ID).Text)
+	ec2svc.showGenericModal(grid, 80, 50)
 }
 
 // TODO: could this be a generic filter box ?
@@ -423,22 +373,28 @@ func (ec2svc *ec2Service) chooseAMIFilters() {
 	form.AddButton("Cancel", buttonCancelFunc)
 	form.AddFormItem(inputField)
 	form.SetTitle("Filter AMIs").SetBorder(true)
-	ec2svc.showGenericModal("Filter AMIs", form, 80, 10) // 80x10 seems good for my screen
+	ec2svc.showGenericModal(form, 80, 10) // 80x10 seems good for my screen
 }
 
 // shows a generic modal box (rather than a confirmation-only box) centered at screen
 // props to skanehira from the docker tui "docui" for this! code is at github.com/skanehira/docui
-func (ec2svc *ec2Service) showGenericModal(title string, p tview.Primitive, width, height int) {
-	centeredModal := tview.NewGrid().
-		SetColumns(0, width, 0).
+func (ec2svc *ec2Service) showGenericModal(p tview.Primitive, width, height int) {
+	var centeredModal *eGrid
+	// if g, ok := p.(*eGrid); ok {    // TODO: grid inside centered grid correctly; tview.Grid
+	//     centeredModal = g
+	//     centeredModal.SetColumns(0, width, 0).
+	//                     SetRows(0, height, 0)
+	//     // ec2svc.StatusBar.SetText("m grid")
+	// } else {
+	centeredModal = NewEgrid(ec2svc.RootPage)
+	centeredModal.SetColumns(0, width, 0).
 		SetRows(0, height, 0).
 		AddItem(p, 1, 1, 1, 1, 0, 0, true)
-	currPageName := ec2svc.RootPage.GetCurrentPageName()
-	ec2svc.RootPage.EAddAndSwitchToPage(title, centeredModal, true) // resize=true
-	ec2svc.RootPage.ShowPage(currPageName)                          // redraw on top (bottom ?) of the box
-}
 
-var test = make([]byte, 5)
+	currPageName := ec2svc.RootPage.GetCurrentPageName()
+	ec2svc.RootPage.EAddAndSwitchToPage("centered modal", centeredModal, true) // resize=true
+	ec2svc.RootPage.ShowPage(currPageName)                                     // redraw on top (bottom ?) of the box
+}
 
 // shows a modal box with msg and switches back to previous page. this is useful for ont-time usage (no nested boxes)
 func (ec2svc *ec2Service) showConfirmationBox(msg string, doneFunc func()) {
@@ -483,7 +439,7 @@ func (ec2svc *ec2Service) fillVolumesTable() {
 func (ec2svc *ec2Service) fillInstancesTable() {
 
 	colNames := []string{"ID", "AMI", "Type", "State"} // TODO
-	ec2svc.instances = ec2svc.Model.GetEC2Instances()                 // directly invokes a method on the model
+	ec2svc.instances = ec2svc.Model.GetEC2Instances()  // directly invokes a method on the model
 	for firstColIdx := 0; firstColIdx < len(colNames); firstColIdx++ {
 		instancesTable.SetCell(0, firstColIdx,
 			tview.NewTableCell(colNames[firstColIdx]).SetAlign(tview.AlignCenter).SetSelectable(false).SetAttributes(tcell.AttrBold))
@@ -541,7 +497,7 @@ func listener1(action common.Action) {
 // TODO: enum ? func (enum SummaryStatus) MarshalValue() (string, error)
 // ============ helper functions
 // given an instance ID, return the row index of the instance in instancesTable t
-func rowIndexFromTable(t *tview.Table, instanceID string) int {
+func rowIndexFromTable(t *eTable, instanceID string) int {
 	idx := -1
 	for rowIdx := 1; rowIdx < t.GetRowCount(); rowIdx++ { // 1 because first row is for column labels
 		id := t.GetCell(rowIdx, COL_EC2_ID).Text
@@ -554,7 +510,7 @@ func rowIndexFromTable(t *tview.Table, instanceID string) int {
 }
 
 // colorize a row in a given instancesTable
-func colorizeRowInTable(t *tview.Table, row int, color tcell.Color) {
+func colorizeRowInTable(t *eTable, row int, color tcell.Color) {
 	for col := 0; col < t.GetColumnCount(); col++ {
 		t.GetCell(row, col).SetBackgroundColor(color)
 	}
@@ -583,27 +539,30 @@ func getNextTriggersNoEmptyTriggers(currState ssm.State, emptyTriggerKey string)
 }
 
 // edit the instance status radio button according to current state
-func editInstanceStatusRadioButton(currStateText string){
-			currState := ssm.State{Name: currStateText}
-			EC2InstancesStateMachine.GoToState(currState, false)
-			var allowedActions []ssm.Trigger                                        // valid next actions/triggers will be returned here
-			if trig := EC2InstancesStateMachine.GetEmptyTrigger(); trig.Key != "" { // empty trigger is defined
-				allowedActions = getNextTriggersNoEmptyTriggers(currState, trig.Key)
-			} else {
-				allowedActions = EC2InstancesStateMachine.GetNextTriggers()
+func editInstanceStatusRadioButton(currStateText string) {
+	currState := ssm.State{Name: currStateText}
+	EC2InstancesStateMachine.GoToState(currState, false)
+	var allowedActions []ssm.Trigger                                        // valid next actions/triggers will be returned here
+	if trig := EC2InstancesStateMachine.GetEmptyTrigger(); trig.Key != "" { // empty trigger is defined
+		allowedActions = getNextTriggersNoEmptyTriggers(currState, trig.Key)
+	} else {
+		allowedActions = EC2InstancesStateMachine.GetNextTriggers()
+	}
+	for idx, optName := range instanceStatusRadioButton.GetOptions() { // TODO: urgh
+		enabled := false
+		for _, allowedAction := range allowedActions {
+			if allowedAction.Key == optName {
+				instanceStatusRadioButton.EnableOptionByIdx(idx)
+				enabled = true
+				break
 			}
-			for idx, optName := range instanceStatusRadioButton.GetOptions() { // TODO: urgh
-                enabled := false
-				for _, allowedAction := range allowedActions {
-					if allowedAction.Key == optName {
-						instanceStatusRadioButton.EnableOptionByIdx(idx)
-                        enabled = true
-                        break
-					}
-				}
-				if !enabled { instanceStatusRadioButton.DisableOptionByIdx(idx) }
-			}
-        }
+		}
+		if !enabled {
+			instanceStatusRadioButton.DisableOptionByIdx(idx)
+		}
+	}
+}
+
 // tweak the edit grid according to each instance
 func modifyEditGrid(g *eGrid, instanceIdx int) {
 
