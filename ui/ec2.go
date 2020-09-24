@@ -194,11 +194,11 @@ func (ec2svc *ec2Service) setCallbacks() {
 	instancesFlexCallBacks := map[tcell.Key]func(){
 		tcell.KeyCtrlL: func() { ec2svc.chooseAMIFilters() },
 	}
-    instancesFlex.SetShiftFocusFunc(ec2svc.MainApp)
+	instancesFlex.SetShiftFocusFunc(ec2svc.MainApp)
 	instancesFlex.UpdateKeyToFunc(instancesFlexCallBacks)
 
 	// edit grid (TODO: copy pasta from above)
-    editInstancesGrid.SetShiftFocusFunc(ec2svc.MainApp)
+	editInstancesGrid.SetShiftFocusFunc(ec2svc.MainApp)
 
 	// radio button
 	instanceStatusRadioButtonCallBacks := map[tcell.Key]func(){
@@ -244,7 +244,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 	volumesTable.UpdateKeyToFunc(volumesTableCallBacks)
 
 	// TODO: unify flexes
-    volumesFlex.SetShiftFocusFunc(ec2svc.MainApp)
+	volumesFlex.SetShiftFocusFunc(ec2svc.MainApp)
 }
 
 func (ec2svc *ec2Service) editVolumes() {
@@ -259,21 +259,19 @@ func (ec2svc *ec2Service) editVolumes() {
 	inputFieldVolumeIops.SetLabel("IOPS")
 	inputFieldVolumeSize.SetLabel("Size (GiB)")
 	dropDownVolumeType.SetLabel("Type")
-	grid.SetBorders(true).SetTitle(volumesTable.GetCell(row, COL_EBS_ID).Text)
+	grid.SetBorders(true).SetTitle("HAAAAAALP")
 	dropDownVolumeType.SetOptions([]string{"Magnetic (standard)", "General Purpose SSD (gp2)", "Provisioned IOPS SSD (io1)", "Provisioned IOPS SSD (io2)"}, nil)
 	inputFieldVolumeIops.SetText(volumesTable.GetCell(row, COL_EBS_IOPS).Text)
 	inputFieldVolumeSize.SetText(volumesTable.GetCell(row, COL_EBS_SIZE).Text)
 	// dropDownVolumeType.SetIndex()       // TODO
 	// grid.SetSize(2, 2, 10, 20) // numRows, numCols, rowSize, colSize
-    grid.SetRows(2, 2)
-	grid.SetColumns(0, 30)
-	grid.EAddItem(dropDownVolumeType, 0, 0, 1, 1, 0, 0, true) // row, col, rowSpan, colSpan, minGridHeight, minGridWidth, focus
-	grid.EAddItem(inputFieldVolumeSize, 1, 0, 1, 1, 0, 0, false)
-	grid.EAddItem(radioButtonVolumeStatus, 0, 1, 1, 1, 0, 0, false)
-	// editInstancesGrid.EAddItem(instanceStatusRadioButton, 0, 0, 1, 2, 0, 0, true)
-	grid.SetBorders(true).SetTitle(volumesTable.GetCell(row, COL_EBS_ID).Text)
-    grid.SetShiftFocusFunc(ec2svc.MainApp)
-	ec2svc.showGenericModal(grid, 120, 80)
+	grid.SetRows(3, 3)
+	grid.SetColumns(1, 0, 0, 1)
+	grid.EAddItem(dropDownVolumeType, 0, 1, 1, 1, 0, 0, true) // row, col, rowSpan, colSpan, minGridHeight, minGridWidth, focus
+	grid.EAddItem(inputFieldVolumeSize, 1, 1, 1, 1, 0, 0, false)
+	grid.EAddItem(radioButtonVolumeStatus, 0, 2, 2, 2, 0, 0, false)
+	grid.SetShiftFocusFunc(ec2svc.MainApp)
+	ec2svc.showGenericModal(grid, 50, 10)
 }
 
 // TODO: could this be a generic filter box ?
@@ -363,21 +361,27 @@ func (ec2svc *ec2Service) chooseAMIFilters() {
 // props to skanehira from the docker tui "docui" for this! code is at github.com/skanehira/docui
 func (ec2svc *ec2Service) showGenericModal(p tview.Primitive, width, height int) {
 	var centeredModal *eGrid
+	// unfortunately you can't access grid's minumum width or height. what to do ?
 	// if g, ok := p.(*eGrid); ok {    // TODO: grid inside centered grid correctly; tview.Grid
 	//     centeredModal = g
-	//     centeredModal.SetColumns(0, width, 0).
-	//                     SetRows(0, height, 0)
-	//     // ec2svc.StatusBar.SetText("m grid")
+	// log.Println("OUR GRID")
+	// // trying a flex instead
+	// centeredModal := NewEFlex(ec2svc.RootPage).SetFullScreen(false).AddItem(
+	//     tview.NewFlex().SetDirection(tview.FlexColumn).AddItem(p, width, 0, true),
+	//     height, 0, true)
+	// centeredModal.SetColumns(0, width, 0).
+	//                 SetRows(0, height, 0)
+	// ec2svc.StatusBar.SetText("m grid")
 	// } else {
 	centeredModal = NewEgrid(ec2svc.RootPage)
 	centeredModal.SetColumns(0, width, 0).
 		SetRows(0, height, 0).
-		AddItem(p, 1, 1, 1, 1, 0, 0, true)
-    // }
-
+		AddItem(p, 1, 1, 1, 1, 0, 0, true) // focus=true
+		// }
 	currPageName := ec2svc.RootPage.GetCurrentPageName()
 	ec2svc.RootPage.EAddAndSwitchToPage("centered modal", centeredModal, true) // resize=true
 	ec2svc.RootPage.ShowPage(currPageName)                                     // redraw on top (bottom ?) of the box
+
 }
 
 // shows a modal box with msg and switches back to previous page. this is useful for ont-time usage (no nested boxes)

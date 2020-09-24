@@ -2,14 +2,13 @@ package ui
 
 import (
 	"fmt"
-    "reflect"
+	"reflect"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/gdamore/tcell"
 	"github.com/rivo/tview"
 )
-
 
 // type viewComponent struct {
 // 	ID      string           // unique id for the component; assigned as the address of the actual ui element
@@ -22,7 +21,6 @@ type mainUI struct {
 	RootPage  *ePages
 	StatusBar *StatusBar
 }
-
 
 // services themselves are a way to group a model (the backend sdk) and the corresponding view. i don't know what will be the view as of this moment, but here goes nothing
 // each service has a structure defined in the corresponding .go file
@@ -37,15 +35,16 @@ type mainUI struct {
 // exported methods of names similar to the original ui elements (from tview package) are prefixed with the vowel 'E' (capital E) for no reason. similarily, 'e' prefixes the custom ui elements defined
 
 type inputCapturer struct {
-    // setKeyToFunc(p tview.Primitive, keyToFunc map[tcell.Key]func()){
-    keyToFunc map[tcell.Key]func()
+	// setKeyToFunc(p tview.Primitive, keyToFunc map[tcell.Key]func()){
+	keyToFunc map[tcell.Key]func()
 }
 
-func (i *inputCapturer) UpdateKeyToFunc(keyToF map[tcell.Key]func()){
-    for k, v := range keyToF {
-        i.keyToFunc[k] = v
-    }
+func (i *inputCapturer) UpdateKeyToFunc(keyToF map[tcell.Key]func()) {
+	for k, v := range keyToF {
+		i.keyToFunc[k] = v
+	}
 }
+
 // TODO: generalize
 // uses SetInputCapture on primitive
 // func (i *inputCapturer) setKeyToFunc(ifce interface{}){
@@ -70,42 +69,42 @@ func (i *inputCapturer) UpdateKeyToFunc(keyToF map[tcell.Key]func()){
 // ePages definition and methods
 type ePages struct {
 	*tview.Pages
-    *inputCapturer
+	*inputCapturer
 	HelpMessage string
 	pageStack   []string // used for moving backwards one page at a time
 }
 
 func NewEPages() *ePages {
 	p := ePages{
-		Pages:     tview.NewPages(),
-		pageStack: []string{},
-		HelpMessage:          "NO HELP MESSAGE (maybe submit a pull request ?)",
-        inputCapturer: &inputCapturer{ keyToFunc: make(map[tcell.Key]func()) },
-    }
-    p.inputCapturer.UpdateKeyToFunc(map[tcell.Key]func(){
-    //     tcell.Key('?'): func(){ p.DisplayHelpMessage(p.HelpMessage)},
-        tcell.Key('q'): func(){ p.ESwitchToPreviousPage() },
-    })
-    p.setKeyToFunc()
+		Pages:         tview.NewPages(),
+		pageStack:     []string{},
+		HelpMessage:   "NO HELP MESSAGE (maybe submit a pull request ?)",
+		inputCapturer: &inputCapturer{keyToFunc: make(map[tcell.Key]func())},
+	}
+	p.inputCapturer.UpdateKeyToFunc(map[tcell.Key]func(){
+		//     tcell.Key('?'): func(){ p.DisplayHelpMessage(p.HelpMessage)},
+		tcell.Key('q'): func() { p.ESwitchToPreviousPage() },
+	})
+	p.setKeyToFunc()
 	return &p
 }
 
+func (p *ePages) setKeyToFunc() { // TODO: see repeated method on other types
+	p.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		uKey := event.Key()
+		if event.Rune() != 0 {
+			uKey = tcell.Key(event.Rune())
+		}
+		for k, f := range p.keyToFunc {
+			if k == uKey {
+				f()
+				break
+			}
+		}
+		return event
+	})
+}
 
-func (p *ePages) setKeyToFunc(){        // TODO: see repeated method on other types
-        p.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-            uKey := event.Key()
-            if event.Rune() != 0 {
-                uKey = tcell.Key(event.Rune())
-            }
-            for k, f := range p.keyToFunc{
-                if k == uKey {
-                    f()
-                    break
-                }
-            }
-            return event
-        })
-    }
 // same as AddPage
 func (p *ePages) EAddPage(name string, item tview.Primitive, resize, visible bool) *ePages {
 	p.AddPage(name, item, resize, visible)
@@ -142,7 +141,7 @@ func (p *ePages) ESwitchToPreviousPage() *ePages {
 func (p *ePages) DisplayHelpMessage(msg string) *ePages {
 	helpPage := tview.NewTextView()
 	// helpPage.SetBackgroundColor(tcell.ColorBlue)
-    helpPage.SetTitle("HALP ME").SetTitleAlign(tview.AlignCenter).SetBorder(true)
+	helpPage.SetTitle("HALP ME").SetTitleAlign(tview.AlignCenter).SetBorder(true)
 	helpPage.SetText(msg)
 	return p.EAddAndSwitchToPage("help", helpPage, true) // "help" page gets overriden each time; resizable=true
 }
@@ -153,16 +152,15 @@ func (p *ePages) GetPreviousPageName() string {
 
 func (p *ePages) GetCurrentPageName() string {
 	currentPageName, _ := p.GetFrontPage()
-    return currentPageName
+	return currentPageName
 }
-
 
 // TODO: this is a copy pasta from eGrid
 // =================================
 // eFlex definition and methods
 type eFlex struct {
-    *tview.Flex
-    *inputCapturer
+	*tview.Flex
+	*inputCapturer
 	Members              []tview.Primitive // equivalent to the unexported member 'items' in tview.Grid
 	CurrentMemberInFocus int               // index of the current member that has focus
 	HelpMessage          string
@@ -176,15 +174,15 @@ func NewEFlex(parentPages *ePages) *eFlex {
 		CurrentMemberInFocus: 0,
 		HelpMessage:          "NO HELP MESSAGE (maybe submit a pull request ?)",
 		parent:               parentPages,
-        inputCapturer: &inputCapturer{ keyToFunc: make(map[tcell.Key]func()) },
+		inputCapturer:        &inputCapturer{keyToFunc: make(map[tcell.Key]func())},
 	}
-    f.inputCapturer.UpdateKeyToFunc(map[tcell.Key]func(){
-        tcell.Key('?'): func(){ f.DisplayHelp()},
-    })
-    f.setKeyToFunc()
+	f.inputCapturer.UpdateKeyToFunc(map[tcell.Key]func(){
+		tcell.Key('?'): func() { f.DisplayHelp() },
+	})
+	f.setKeyToFunc()
 	return &f
 }
-func (f *eFlex) EAddItem(p tview.Primitive, fixedSize, proportion int, focus bool) *eFlex{
+func (f *eFlex) EAddItem(p tview.Primitive, fixedSize, proportion int, focus bool) *eFlex {
 	f.AddItem(p, fixedSize, proportion, focus)
 	f.Members = append(f.Members, p)
 	return f
@@ -194,40 +192,50 @@ func (f *eFlex) DisplayHelp() {
 }
 
 // if only we can shift focus to grid/flex members without a tview.Application...
-func (f *eFlex) SetShiftFocusFunc(app *tview.Application){
-    f.UpdateKeyToFunc(map[tcell.Key]func(){
-        tcell.KeyTab: func(){
-            if len(f.Members) > 0 {
-                f.CurrentMemberInFocus++
-                if f.CurrentMemberInFocus == len(f.Members) { //  f.CurrentMemberInFocus %= len(f.Members)
-                    f.CurrentMemberInFocus = 0
-                }
-                app.SetFocus(f.Members[f.CurrentMemberInFocus])
-            }
-        },
-    })
+func (f *eFlex) SetShiftFocusFunc(app *tview.Application) {
+	f.UpdateKeyToFunc(map[tcell.Key]func(){
+		tcell.KeyTab: func() {
+			if len(f.Members) > 0 {
+				f.CurrentMemberInFocus++
+				if f.CurrentMemberInFocus == len(f.Members) { //  f.CurrentMemberInFocus %= len(f.Members)
+					f.CurrentMemberInFocus = 0
+				}
+				app.SetFocus(f.Members[f.CurrentMemberInFocus])
+			}
+		},
+		tcell.KeyBacktab: func() {
+			if len(f.Members) > 0 {
+				f.CurrentMemberInFocus--
+				if f.CurrentMemberInFocus < 0 { //  f.CurrentMemberInFocus %= len(f.Members)
+					f.CurrentMemberInFocus = len(f.Members)
+				}
+				app.SetFocus(f.Members[f.CurrentMemberInFocus])
+			}
+		},
+	})
 }
 
-func (f *eFlex) setKeyToFunc(){        // TODO: see repeated method on other types
-        f.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-            uKey := event.Key()
-            if event.Rune() != 0 {
-                uKey = tcell.Key(event.Rune())
-            }
-            for k, f := range f.keyToFunc{
-                if k == uKey {
-                    f()
-                    break
-                }
-            }
-            return event
-        })
-    }
+func (f *eFlex) setKeyToFunc() { // TODO: see repeated method on other types
+	f.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		uKey := event.Key()
+		if event.Rune() != 0 {
+			uKey = tcell.Key(event.Rune())
+		}
+		for k, f := range f.keyToFunc {
+			if k == uKey {
+				f()
+				break
+			}
+		}
+		return event
+	})
+}
+
 // ==================================
 // eGrid definition and methods
 type eGrid struct {
 	*tview.Grid
-    *inputCapturer
+	*inputCapturer
 	Members              []tview.Primitive // equivalent to the unexported member 'items' in tview.Grid
 	CurrentMemberInFocus int               // index of the current member that has focus
 	HelpMessage          string
@@ -241,12 +249,12 @@ func NewEgrid(parentPages *ePages) *eGrid {
 		CurrentMemberInFocus: 0,
 		HelpMessage:          "NO HELP MESSAGE (maybe submit a pull request ?)",
 		parent:               parentPages,
-        inputCapturer: &inputCapturer{ keyToFunc: make(map[tcell.Key]func()) },
+		inputCapturer:        &inputCapturer{keyToFunc: make(map[tcell.Key]func())},
 	}
-    g.inputCapturer.UpdateKeyToFunc(map[tcell.Key]func(){
-        tcell.Key('?'): func(){ g.DisplayHelp()},
-    })
-    g.setKeyToFunc()
+	g.inputCapturer.UpdateKeyToFunc(map[tcell.Key]func(){
+		tcell.Key('?'): func() { g.DisplayHelp() },
+	})
+	g.setKeyToFunc()
 	return &g
 }
 func (g *eGrid) EAddItem(p tview.Primitive, row, column, rowSpan, colSpan, minGridHeight, minGridWidth int, focus bool) *eGrid {
@@ -261,65 +269,75 @@ func (g *eGrid) DisplayHelp() {
 }
 
 // if only we can shift focus to grid/flex members without a tview.Application...
-func (g *eGrid) SetShiftFocusFunc(app *tview.Application){
-    g.UpdateKeyToFunc(map[tcell.Key]func(){
-        tcell.KeyTab: func(){
-            if len(g.Members) > 0 {
-                g.CurrentMemberInFocus++
-                if g.CurrentMemberInFocus == len(g.Members) { //  g.CurrentMemberInFocus %= len(g.Members)
-                    g.CurrentMemberInFocus = 0
-                }
-                app.SetFocus(g.Members[g.CurrentMemberInFocus])
-            }
-        },
-    })
+func (g *eGrid) SetShiftFocusFunc(app *tview.Application) {
+	g.UpdateKeyToFunc(map[tcell.Key]func(){
+		tcell.KeyTab: func() {
+			if len(g.Members) > 0 {
+				g.CurrentMemberInFocus++
+				if g.CurrentMemberInFocus >= len(g.Members) { //  g.CurrentMemberInFocus %= len(g.Members)
+					g.CurrentMemberInFocus = 0
+				}
+				app.SetFocus(g.Members[g.CurrentMemberInFocus])
+			}
+		},
+		tcell.KeyBacktab: func() {
+			if len(g.Members) > 0 {
+				g.CurrentMemberInFocus--
+				if g.CurrentMemberInFocus < 0 { //  g.CurrentMemberInFocus %= len(g.Members)
+					g.CurrentMemberInFocus = len(g.Members) - 1
+				}
+				app.SetFocus(g.Members[g.CurrentMemberInFocus])
+			}
+		},
+	})
 }
 
-func (g *eGrid) setKeyToFunc(){        // TODO: see repeated method on other types
-        g.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-            uKey := event.Key()
-            if event.Rune() != 0 {
-                uKey = tcell.Key(event.Rune())
-            }
-            for k, f := range g.keyToFunc{
-                if k == uKey {
-                    f()
-                    break
-                }
-            }
-            return event
-        })
-    }
+func (g *eGrid) setKeyToFunc() { // TODO: see repeated method on other types
+	g.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		uKey := event.Key()
+		if event.Rune() != 0 {
+			uKey = tcell.Key(event.Rune())
+		}
+		for k, f := range g.keyToFunc {
+			if k == uKey {
+				f()
+				break
+			}
+		}
+		return event
+	})
+}
 
 // eTable definition and methods
 type eTable struct {
 	*tview.Table
-    *inputCapturer
+	*inputCapturer
 }
 
 func NewEtable() *eTable {
 	t := eTable{
-		Table:                 tview.NewTable(),
-        inputCapturer: &inputCapturer{ keyToFunc: make(map[tcell.Key]func()) },
+		Table:         tview.NewTable(),
+		inputCapturer: &inputCapturer{keyToFunc: make(map[tcell.Key]func())},
 	}
-    t.setKeyToFunc()
+	t.setKeyToFunc()
 	return &t
 }
-func (t *eTable) setKeyToFunc(){        // TODO: see repeated method on other types
-        t.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-            uKey := event.Key()
-            if event.Rune() != 0 {
-                uKey = tcell.Key(event.Rune())
-            }
-            for k, f := range t.keyToFunc{
-                if k == uKey {
-                    f()
-                    break
-                }
-            }
-            return event
-        })
-    }
+func (t *eTable) setKeyToFunc() { // TODO: see repeated method on other types
+	t.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		uKey := event.Key()
+		if event.Rune() != 0 {
+			uKey = tcell.Key(event.Rune())
+		}
+		for k, f := range t.keyToFunc {
+			if k == uKey {
+				f()
+				break
+			}
+		}
+		return event
+	})
+}
+
 // =============================
 // radio button primitive. copied from the demo https://github.com/rivo/tview/blob/master/demos/primitive
 // RadioButtons implements a simple primitive for radio button selections.
@@ -329,7 +347,7 @@ type radioButtonOption struct {
 }
 type radioButtons struct {
 	*tview.Box
-    *inputCapturer
+	*inputCapturer
 	options       []radioButtonOption
 	currentOption int // index of current selected option
 }
@@ -340,13 +358,13 @@ func NewRadioButtons(optionNames []string) *radioButtons {
 	for idx, name := range optionNames {
 		options[idx] = radioButtonOption{name, true} // default: all enabled
 	}
-    r := radioButtons{
-		Box:     tview.NewBox(),
-		options: options,
-        inputCapturer: &inputCapturer{ keyToFunc: make(map[tcell.Key]func()) },
+	r := radioButtons{
+		Box:           tview.NewBox(),
+		options:       options,
+		inputCapturer: &inputCapturer{keyToFunc: make(map[tcell.Key]func())},
 	}
-    r.setKeyToFunc()
-    return &r
+	r.setKeyToFunc()
+	return &r
 }
 
 // Draw draws this primitive onto the screen.
@@ -405,11 +423,11 @@ func (r *radioButtons) GetCurrentOptionName() string {
 }
 
 func (r *radioButtons) GetOptions() []string {
-    opts := make([]string, len(r.options))
+	opts := make([]string, len(r.options))
 	for idx, opt := range r.options {
-        opts[idx] = opt.name
-    }
-    return opts
+		opts[idx] = opt.name
+	}
+	return opts
 }
 func (r *radioButtons) DisableOptionByName(name string) {
 	for _, opt := range r.options {
@@ -427,21 +445,22 @@ func (r *radioButtons) DisableOptionByIdx(idx int) {
 func (r *radioButtons) EnableOptionByIdx(idx int) {
 	r.options[idx].enabled = true
 }
-func (r *radioButtons) setKeyToFunc(){        // TODO: see repeated method on other types
-        r.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-            uKey := event.Key()
-            if event.Rune() != 0 {
-                uKey = tcell.Key(event.Rune())
-            }
-            for k, f := range r.keyToFunc{
-                if k == uKey {
-                    f()
-                    break
-                }
-            }
-            return event
-        })
-    }
+func (r *radioButtons) setKeyToFunc() { // TODO: see repeated method on other types
+	r.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		uKey := event.Key()
+		if event.Rune() != 0 {
+			uKey = tcell.Key(event.Rune())
+		}
+		for k, f := range r.keyToFunc {
+			if k == uKey {
+				f()
+				break
+			}
+		}
+		return event
+	})
+}
+
 // ====================
 // status bar
 type StatusBar struct {
@@ -472,33 +491,33 @@ func (bar *StatusBar) Focus(delegate func(p tview.Primitive)) {
 	bar.Blur()
 }
 
-
 // helper functions
 // quite silly function (TODO: probably refactor)
 func stringFromAWSVar(awsVar interface{}) string {
-    var t string
-    switch v := awsVar.(type){
-    case *string:
-        t = aws.StringValue(v)
-    case *int:
-        t = fmt.Sprint(aws.IntValue(v))      // hmmmm
-    case *int64:
-        // go vet being helpful as always:
-        // conversion from int to string yields a string of one rune, 
-        // not a string of digits (did you mean fmt.Sprint(x)?)
-        t = fmt.Sprint(aws.Int64Value(v))      // hmmmm
-    default:
-        switch reflect.TypeOf(v).Kind(){
-        case reflect.String:    // should be a type derived from string ?
-            t = reflect.ValueOf(v).String()
-        case reflect.Int, reflect.Int64:
-            t = fmt.Sprint(reflect.ValueOf(v).Int())
-        default:
-            t = ""
-        }
-    }
-    return t
+	var t string
+	switch v := awsVar.(type) {
+	case *string:
+		t = aws.StringValue(v)
+	case *int:
+		t = fmt.Sprint(aws.IntValue(v)) // hmmmm
+	case *int64:
+		// go vet being helpful as always:
+		// conversion from int to string yields a string of one rune,
+		// not a string of digits (did you mean fmt.Sprint(x)?)
+		t = fmt.Sprint(aws.Int64Value(v)) // hmmmm
+	default:
+		switch reflect.TypeOf(v).Kind() {
+		case reflect.String: // should be a type derived from string ?
+			t = reflect.ValueOf(v).String()
+		case reflect.Int, reflect.Int64:
+			t = fmt.Sprint(reflect.ValueOf(v).Int())
+		default:
+			t = ""
+		}
+	}
+	return t
 }
+
 // TODO: initially i did this to avoid writing similar functions for the same keys. i think this should be more generalized. also, is this slower than a big jump table (i.e switch/case statement) ?
 // func setKeyToFunc(i interface{}){
 //     // TODO: unify into one type
@@ -520,5 +539,5 @@ func stringFromAWSVar(awsVar interface{}) string {
 // default:
 //     fmt.Println("NOT IMPLEMENTED")
 // }
-// 
+//
 // }
