@@ -82,10 +82,10 @@ func NewEPages() *ePages {
 		HelpMessage:          "NO HELP MESSAGE (maybe submit a pull request ?)",
         inputCapturer: &inputCapturer{ keyToFunc: make(map[tcell.Key]func()) },
     }
-    // p.inputCapturer.UpdateKeyToFunc(map[tcell.Key]func(){
+    p.inputCapturer.UpdateKeyToFunc(map[tcell.Key]func(){
     //     tcell.Key('?'): func(){ p.DisplayHelpMessage(p.HelpMessage)},
-    //     tcell.Key('q'): func(){ p.ESwitchToPreviousPage() },
-    // })
+        tcell.Key('q'): func(){ p.ESwitchToPreviousPage() },
+    })
     p.setKeyToFunc()
 	return &p
 }
@@ -138,19 +138,12 @@ func (p *ePages) ESwitchToPreviousPage() *ePages {
 	return p
 }
 
+// no nested help messages
 func (p *ePages) DisplayHelpMessage(msg string) *ePages {
-
 	helpPage := tview.NewTextView()
-	helpPage.SetBackgroundColor(tcell.ColorBlue).SetTitle("HALP ME").SetTitleAlign(tview.AlignCenter).SetBorder(true)
+	// helpPage.SetBackgroundColor(tcell.ColorBlue)
+    helpPage.SetTitle("HALP ME").SetTitleAlign(tview.AlignCenter).SetBorder(true)
 	helpPage.SetText(msg)
-	helpPage.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		// p.RemovePage("help")
-		if event.Rune() == 'q' {
-			p.ESwitchToPreviousPage()
-		}
-		return event
-	})
-
 	return p.EAddAndSwitchToPage("help", helpPage, true) // "help" page gets overriden each time; resizable=true
 }
 
@@ -187,7 +180,6 @@ func NewEFlex(parentPages *ePages) *eFlex {
 	}
     f.inputCapturer.UpdateKeyToFunc(map[tcell.Key]func(){
         tcell.Key('?'): func(){ f.DisplayHelp()},
-        tcell.Key('q'): func(){ f.parent.ESwitchToPreviousPage() },
     })
     f.setKeyToFunc()
 	return &f
@@ -200,6 +192,22 @@ func (f *eFlex) EAddItem(p tview.Primitive, fixedSize, proportion int, focus boo
 func (f *eFlex) DisplayHelp() {
 	f.parent.DisplayHelpMessage(f.HelpMessage)
 }
+
+// if only we can shift focus to grid/flex members without a tview.Application...
+func (f *eFlex) SetShiftFocusFunc(app *tview.Application){
+    f.UpdateKeyToFunc(map[tcell.Key]func(){
+        tcell.KeyTab: func(){
+            if len(f.Members) > 0 {
+                f.CurrentMemberInFocus++
+                if f.CurrentMemberInFocus == len(f.Members) { //  f.CurrentMemberInFocus %= len(f.Members)
+                    f.CurrentMemberInFocus = 0
+                }
+                app.SetFocus(f.Members[f.CurrentMemberInFocus])
+            }
+        },
+    })
+}
+
 func (f *eFlex) setKeyToFunc(){        // TODO: see repeated method on other types
         f.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
             uKey := event.Key()
@@ -237,7 +245,6 @@ func NewEgrid(parentPages *ePages) *eGrid {
 	}
     g.inputCapturer.UpdateKeyToFunc(map[tcell.Key]func(){
         tcell.Key('?'): func(){ g.DisplayHelp()},
-        tcell.Key('q'): func(){ g.parent.ESwitchToPreviousPage() },
     })
     g.setKeyToFunc()
 	return &g
@@ -251,6 +258,21 @@ func (g *eGrid) EAddItem(p tview.Primitive, row, column, rowSpan, colSpan, minGr
 
 func (g *eGrid) DisplayHelp() {
 	g.parent.DisplayHelpMessage(g.HelpMessage)
+}
+
+// if only we can shift focus to grid/flex members without a tview.Application...
+func (g *eGrid) SetShiftFocusFunc(app *tview.Application){
+    g.UpdateKeyToFunc(map[tcell.Key]func(){
+        tcell.KeyTab: func(){
+            if len(g.Members) > 0 {
+                g.CurrentMemberInFocus++
+                if g.CurrentMemberInFocus == len(g.Members) { //  g.CurrentMemberInFocus %= len(g.Members)
+                    g.CurrentMemberInFocus = 0
+                }
+                app.SetFocus(g.Members[g.CurrentMemberInFocus])
+            }
+        },
+    })
 }
 
 func (g *eGrid) setKeyToFunc(){        // TODO: see repeated method on other types

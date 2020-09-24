@@ -168,19 +168,6 @@ func (ec2svc *ec2Service) drawElements() {
 // set function callbacks for different ui elements
 func (ec2svc *ec2Service) setCallbacks() {
 
-	// common functions used throughout
-	funcShiftFocus := func(p tview.Primitive) {
-		// TODO: check if eFlex or eGrid
-		if len(instancesFlex.Members) > 0 {
-			instancesFlex.CurrentMemberInFocus++
-			if instancesFlex.CurrentMemberInFocus == len(instancesFlex.Members) { //  instancesFlex.CurrentMemberInFocus %= len(instancesFlex.Members)
-				instancesFlex.CurrentMemberInFocus = 0
-			}
-			ec2svc.MainApp.SetFocus(instancesFlex.Members[instancesFlex.CurrentMemberInFocus])
-
-		}
-	}
-
 	// main instancesTable
 	instancesTableCallbacks := map[tcell.Key]func(){
 		tcell.Key('d'): func() {
@@ -205,16 +192,13 @@ func (ec2svc *ec2Service) setCallbacks() {
 	// TODO: unify grids
 	// main instancesFlex
 	instancesFlexCallBacks := map[tcell.Key]func(){
-		tcell.KeyTab:   func() { funcShiftFocus(instancesFlex) },
 		tcell.KeyCtrlL: func() { ec2svc.chooseAMIFilters() },
 	}
+    instancesFlex.SetShiftFocusFunc(ec2svc.MainApp)
 	instancesFlex.UpdateKeyToFunc(instancesFlexCallBacks)
 
 	// edit grid (TODO: copy pasta from above)
-	editInstancesGridCallBacks := map[tcell.Key]func(){
-		tcell.KeyTab: func() { funcShiftFocus(editInstancesGrid) },
-	}
-	editInstancesGrid.UpdateKeyToFunc(editInstancesGridCallBacks)
+    editInstancesGrid.SetShiftFocusFunc(ec2svc.MainApp)
 
 	// radio button
 	instanceStatusRadioButtonCallBacks := map[tcell.Key]func(){
@@ -260,10 +244,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 	volumesTable.UpdateKeyToFunc(volumesTableCallBacks)
 
 	// TODO: unify flexes
-	volumesFlexCallBacks := map[tcell.Key]func(){
-		tcell.KeyTab: func() { funcShiftFocus(volumesFlex) },
-	}
-	volumesFlex.UpdateKeyToFunc(volumesFlexCallBacks)
+    volumesFlex.SetShiftFocusFunc(ec2svc.MainApp)
 }
 
 func (ec2svc *ec2Service) editVolumes() {
@@ -283,14 +264,16 @@ func (ec2svc *ec2Service) editVolumes() {
 	inputFieldVolumeIops.SetText(volumesTable.GetCell(row, COL_EBS_IOPS).Text)
 	inputFieldVolumeSize.SetText(volumesTable.GetCell(row, COL_EBS_SIZE).Text)
 	// dropDownVolumeType.SetIndex()       // TODO
-	grid.SetSize(2, 2, 10, 20) // numRows, numCols, rowSize, colSize
-	// grid.SetColumns(50, 50)
+	// grid.SetSize(2, 2, 10, 20) // numRows, numCols, rowSize, colSize
+    grid.SetRows(2, 2)
+	grid.SetColumns(0, 30)
 	grid.EAddItem(dropDownVolumeType, 0, 0, 1, 1, 0, 0, true) // row, col, rowSpan, colSpan, minGridHeight, minGridWidth, focus
 	grid.EAddItem(inputFieldVolumeSize, 1, 0, 1, 1, 0, 0, false)
 	grid.EAddItem(radioButtonVolumeStatus, 0, 1, 1, 1, 0, 0, false)
 	// editInstancesGrid.EAddItem(instanceStatusRadioButton, 0, 0, 1, 2, 0, 0, true)
 	grid.SetBorders(true).SetTitle(volumesTable.GetCell(row, COL_EBS_ID).Text)
-	ec2svc.showGenericModal(grid, 80, 50)
+    grid.SetShiftFocusFunc(ec2svc.MainApp)
+	ec2svc.showGenericModal(grid, 120, 80)
 }
 
 // TODO: could this be a generic filter box ?
@@ -390,6 +373,7 @@ func (ec2svc *ec2Service) showGenericModal(p tview.Primitive, width, height int)
 	centeredModal.SetColumns(0, width, 0).
 		SetRows(0, height, 0).
 		AddItem(p, 1, 1, 1, 1, 0, 0, true)
+    // }
 
 	currPageName := ec2svc.RootPage.GetCurrentPageName()
 	ec2svc.RootPage.EAddAndSwitchToPage("centered modal", centeredModal, true) // resize=true
