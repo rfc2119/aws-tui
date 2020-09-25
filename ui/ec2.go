@@ -47,16 +47,25 @@ const (
 
 // global ui elements (TODO: perhaps i should make them local somehow)
 var (
-	instancesFlex             *eFlex                // container for the main EC2 page
-	description               = tview.NewTextView() // instance description
-	instancesTable            = NewEtable()         // instance status as in web ui
-	volumesTable              = NewEtable()
-	volumesFlex               *eFlex
-	editVolumesGrid           *eGrid
-	editInstancesGrid         *eGrid
-	instanceOfferingsDropdown = tview.NewDropDown()
-	instanceStatusRadioButton = NewRadioButtons([]string{"Start", "Stop", "Stop (Force)", "Hibernate", "Reboot", "Terminate"}) // all buttons are enabled by default
+    // Instances page
+	instancesTable            = NewEtable()         // Instance table as in web UI
+	instancesFlex             *eFlex                // Container for the main page
+	description               = tview.NewTextView() // Instance description
+	editInstancesGrid         *eGrid                // "Edit Instance" grid
+	instanceOfferingsDropdown = tview.NewDropDown() // Component in "Edit Instance"
+	instanceStatusRadioButton = NewRadioButtons([]string{"Start", "Stop", "Stop (Force)", "Hibernate", "Reboot", "Terminate"}) // all buttons are enabled by default;Component in "Edit Instance"
 	EC2InstancesStateMachine  = common.NewEC2InstancesStateMachine()
+
+
+    // Volumes page
+	volumesTable              = NewEtable()         // Main table for volumes
+	volumesFlex               *eFlex                // Container for main page
+	gridEditVolume           *eGrid                 // "Edit volumes" grid
+	dropDownVolumeType = tview.NewDropDown()        // Component in "Edit volumes"
+	inputFieldVolumeSize = tview.NewInputField()    // Component in "Edit volumes"
+	inputFieldVolumeIops = tview.NewInputField()    // Component in "Edit volumes"
+	radioButtonVolumeStatus = NewRadioButtons([]string{"Attach", "Detach", "Force Detach", "Delete"})                           // Component in "Edit volumes"
+    EBSVolumesStateMachine = common.NewEBSVolumeStateMachine()
 )
 
 type ec2Service struct {
@@ -89,7 +98,7 @@ func (ec2svc *ec2Service) InitView() {
 	instancesFlex = NewEFlex(ec2svc.RootPage)
 	editInstancesGrid = NewEgrid(ec2svc.RootPage)
 	volumesFlex = NewEFlex(ec2svc.RootPage)
-	editVolumesGrid = NewEgrid(ec2svc.RootPage)
+	gridEditVolume = NewEgrid(ec2svc.RootPage)
 
 	ec2svc.drawElements()
 	ec2svc.setCallbacks()
@@ -99,10 +108,6 @@ func (ec2svc *ec2Service) InitView() {
 	instancesTable.SetSelectable(true, false) // rows: true, colums: false means select only rows
 	instancesTable.Select(1, 1)
 	instancesTable.SetFixed(0, 2)
-	volumesTable.SetBorders(false)
-	volumesTable.SetSelectable(true, false) // rows: true, colums: false means select only rows
-	volumesTable.Select(1, 1)
-	volumesTable.SetFixed(0, 2)
 
 	instancesFlex.HelpMessage = HELP_EC2_MAIN
 	instancesFlex.SetDirection(tview.FlexColumn)
@@ -110,22 +115,41 @@ func (ec2svc *ec2Service) InitView() {
 	instancesFlex.EAddItem(instancesTable, 0, 2, true)
 	instancesFlex.EAddItem(description, 0, 1, false)
 
+
+	instanceStatusRadioButton.SetBorder(true).SetTitle("Status")
+	instanceOfferingsDropdown.SetLabel("Type")
+    editInstancesGrid.SetColumns(1, 0, 0, 1)
+    editInstancesGrid.SetRows(1, 10, 1)
+	editInstancesGrid.EAddItem(instanceStatusRadioButton, 1, 1, 1, 1, 0, 0, true)
+	editInstancesGrid.EAddItem(instanceOfferingsDropdown, 1, 2, 1, 1, 0, 0, false)
+
+	volumesTable.SetBorders(false)
+	volumesTable.SetSelectable(true, false) // rows: true, colums: false means select only rows
+	volumesTable.Select(1, 1)
+	volumesTable.SetFixed(0, 2)
+
 	volumesFlex.HelpMessage = HELP_EBS_MAIN
 	volumesFlex.SetDirection(tview.FlexColumn)
 	volumesFlex.SetFullScreen(true)
 	volumesFlex.EAddItem(volumesTable, 0, 1, true)
 
-	instanceStatusRadioButton.SetBorder(true).SetTitle("Status")
-	instanceOfferingsDropdown.SetLabel("Type")
-    editInstancesGrid.SetColumns(1, 0, 0, 1)
-     editInstancesGrid.SetRows(1, 10, 1)
-	editInstancesGrid.EAddItem(instanceStatusRadioButton, 1, 1, 1, 1, 0, 0, true)
-	editInstancesGrid.EAddItem(instanceOfferingsDropdown, 1, 2, 1, 1, 0, 0, false)
+	inputFieldVolumeIops.SetLabel("IOPS")
+	inputFieldVolumeSize.SetLabel("Size (GiB)")
+	dropDownVolumeType.SetLabel("Type")
+	dropDownVolumeType.SetOptions([]string{"Magnetic (standard)", "General Purpose SSD (gp2)", "Provisioned IOPS SSD (io1)", "Provisioned IOPS SSD (io2)"}, nil)
+    gridEditVolume.SetBorders(true).SetTitle("Test")     // Not working :(
+
+	gridEditVolume.SetRows(3, 3)
+	gridEditVolume.SetColumns(1, 0, 0, 1)
+	gridEditVolume.EAddItem(dropDownVolumeType, 0, 1, 1, 1, 0, 0, true) // row, col, rowSpan, colSpan, minGridHeight, minGridWidth, focus
+	gridEditVolume.EAddItem(inputFieldVolumeSize, 1, 1, 1, 1, 0, 0, false)
+	gridEditVolume.EAddItem(radioButtonVolumeStatus, 0, 2, 2, 2, 0, 0, false)
+	gridEditVolume.SetShiftFocusFunc(ec2svc.MainApp)
 
 	ec2svc.RootPage.EAddPage("Instances", instancesFlex, true, false)         // TODO: page names and such; resize=true, visible=false
 	// ec2svc.RootPage.EAddPage("Edit Instance", editInstancesGrid, true, false) // TODO: page names and such
 	ec2svc.RootPage.EAddPage("Volumes", volumesFlex, true, false)             // TODO: page names and such; resize=true, visible=false
-	ec2svc.RootPage.EAddPage("Edit Volume", editVolumesGrid, true, false)     // TODO: page names and such
+	// ec2svc.RootPage.EAddPage("Edit Volume", gridEditVolume, true, false)     // TODO: page names and such
 
 	ec2svc.WatchChanges()
 
@@ -158,9 +182,14 @@ func (ec2svc *ec2Service) setCallbacks() {
 		tcell.Key('e'): func() {
 			// Configuring the state radio button
 			row, _ := instancesTable.GetSelection() // TODO: multi selection
-			editInstanceStatusRadioButton(instancesTable.GetCell(row, COL_EC2_STATE).Text)
+            state := ssm.State{ Name: instancesTable.GetCell(row, COL_EC2_STATE).Text }
+			if err := EC2InstancesStateMachine.GoToState(state, false); err != nil {
+				log.Println(err)
+				return
+			}
+			configureRadioButton(instanceStatusRadioButton, EC2InstancesStateMachine)
 			// TODO: configure the "instance type" drop down
-			editInstancesGrid.SetTitle(instancesTable.GetCell(row, COL_EC2_ID).Text)
+			// editInstancesGrid.SetTitle(instancesTable.GetCell(row, COL_EC2_ID).Text) //TODO
             ec2svc.showGenericModal(editInstancesGrid, 40, 40)
 		},
 		tcell.Key('r'): func() {
@@ -189,19 +218,20 @@ func (ec2svc *ec2Service) setCallbacks() {
 				ec2svc.StatusBar.SetText(fmt.Sprintf("%sing instance", currOpt))
 				row, _ := instancesTable.GetSelection() // TODO: multi selection
 				instanceIds := []string{instancesTable.GetCell(row, COL_EC2_ID).Text}
+                log.Println(instanceIds)
 				switch strings.ToLower(currOpt) { // TODO: do something w/ return value
 				case "start": // TODO: magic names
-					ec2svc.Model.StartEC2Instance(instanceIds)
+					ec2svc.Model.StartEC2Instances(instanceIds)
 				case "stop":
-					ec2svc.Model.StopEC2Instance(instanceIds, false, false)
+					ec2svc.Model.StopEC2Instances(instanceIds, false, false)
 				case "hibernate":
-					ec2svc.Model.StopEC2Instance(instanceIds, false, true) // hibernate=true
+					ec2svc.Model.StopEC2Instances(instanceIds, false, true) // hibernate=true
 				case "stop (force)":
-					ec2svc.Model.StopEC2Instance(instanceIds, true, false) // force=true
+					ec2svc.Model.StopEC2Instances(instanceIds, true, false) // force=true
 				case "reboot":
-					ec2svc.Model.RebootEC2Instance(instanceIds)
+					ec2svc.Model.RebootEC2Instances(instanceIds)
 				case "terminate":
-					ec2svc.Model.TerminateEC2Instance(instanceIds)
+					ec2svc.Model.TerminateEC2Instances(instanceIds)
 				}
 			})
 		},
@@ -223,40 +253,32 @@ func (ec2svc *ec2Service) setCallbacks() {
 	})
 
 	volumesTableCallBacks := map[tcell.Key]func(){
-		tcell.Key('e'): func() { ec2svc.editVolumes() },
 		tcell.Key('r'): func() { ec2svc.fillVolumesTable() },
+		tcell.Key('e'): func() {
+			// Configuring the state radio button
+			row, _ := volumesTable.GetSelection() // TODO: multi selection
+            state := ssm.State{ Name: volumesTable.GetCell(row, COL_EBS_STATE).Text }
+			if err := EBSVolumesStateMachine.GoToState(state, false); err != nil {
+				log.Println(err)
+				return
+			}
+			configureRadioButton(radioButtonVolumeStatus, EBSVolumesStateMachine)
+            inputFieldVolumeIops.SetText(volumesTable.GetCell(row, COL_EBS_IOPS).Text) //TODO: put in main screen
+            inputFieldVolumeSize.SetText(volumesTable.GetCell(row, COL_EBS_SIZE).Text)
+            // dropDownVolumeType.SetIndex()       // TODO
+	        ec2svc.showGenericModal(gridEditVolume, 50, 10)
+		},
 	}
 	volumesTable.UpdateKeyToFunc(volumesTableCallBacks)
+    radioButtonVolumeStatusCallbacks := map[tcell.Key]func(){
+		tcell.Key(' '): func() {
+        },
+        // TODO
+    }
+    radioButtonVolumeStatus.UpdateKeyToFunc(radioButtonVolumeStatusCallbacks)
 
     // The flex container holding the volumes table
 	volumesFlex.SetShiftFocusFunc(ec2svc.MainApp)
-}
-
-func (ec2svc *ec2Service) editVolumes() {
-
-	grid := NewEgrid(ec2svc.RootPage)
-	dropDownVolumeType := tview.NewDropDown()
-	inputFieldVolumeSize := tview.NewInputField()
-	inputFieldVolumeIops := tview.NewInputField()
-	radioButtonVolumeStatus := NewRadioButtons([]string{"Attach", "Detach", "Force Detach", "Delete"})
-
-	row, _ := volumesTable.GetSelection()
-	inputFieldVolumeIops.SetLabel("IOPS")
-	inputFieldVolumeSize.SetLabel("Size (GiB)")
-	dropDownVolumeType.SetLabel("Type")
-	grid.SetBorders(true).SetTitle("HAAAAAALP")
-	dropDownVolumeType.SetOptions([]string{"Magnetic (standard)", "General Purpose SSD (gp2)", "Provisioned IOPS SSD (io1)", "Provisioned IOPS SSD (io2)"}, nil)
-	inputFieldVolumeIops.SetText(volumesTable.GetCell(row, COL_EBS_IOPS).Text)
-	inputFieldVolumeSize.SetText(volumesTable.GetCell(row, COL_EBS_SIZE).Text)
-	// dropDownVolumeType.SetIndex()       // TODO
-	// grid.SetSize(2, 2, 10, 20) // numRows, numCols, rowSize, colSize
-	grid.SetRows(3, 3)
-	grid.SetColumns(1, 0, 0, 1)
-	grid.EAddItem(dropDownVolumeType, 0, 1, 1, 1, 0, 0, true) // row, col, rowSpan, colSpan, minGridHeight, minGridWidth, focus
-	grid.EAddItem(inputFieldVolumeSize, 1, 1, 1, 1, 0, 0, false)
-	grid.EAddItem(radioButtonVolumeStatus, 0, 2, 2, 2, 0, 0, false)
-	grid.SetShiftFocusFunc(ec2svc.MainApp)
-	ec2svc.showGenericModal(grid, 50, 10)
 }
 
 // TODO: could this be a generic filter box ?
@@ -380,6 +402,7 @@ func (ec2svc *ec2Service) showConfirmationBox(msg string, doneFunc func()) {
 				doneFunc()
 			}
 			ec2svc.RootPage.ESwitchToPreviousPage()
+	        ec2svc.RootPage.ShowPage(ec2svc.RootPage.GetPreviousPageName()) // +1
 		})
 	ec2svc.RootPage.EAddAndSwitchToPage("modal", modal, false)      // resize=false
 	ec2svc.RootPage.ShowPage(ec2svc.RootPage.GetPreviousPageName()) // +1
@@ -510,27 +533,27 @@ func getNextTriggersNoEmptyTriggers(currState ssm.State, emptyTriggerKey string)
 	return ret
 }
 
-// Edit the instance status radio button according to current state
-func editInstanceStatusRadioButton(currStateText string) {
-	currState := ssm.State{Name: currStateText}
-	EC2InstancesStateMachine.GoToState(currState, false)
-	var allowedActions []ssm.Trigger                                        // valid next actions/triggers will be returned here
-	if trig := EC2InstancesStateMachine.GetEmptyTrigger(); trig.Key != "" { // empty trigger is defined
-		allowedActions = getNextTriggersNoEmptyTriggers(currState, trig.Key)
+// Configures a radio button according to current state to state machine sm
+func configureRadioButton(rButton *RadioButtons, sm *common.EStateMachine) {
+	// currState := ssm.State{Name: currStateText}
+	// EC2InstancesStateMachine.GoToState(currState, false)
+	var allowedActions []ssm.Trigger    // Valid next actions/triggers will be returned here
+	if trig := sm.GetEmptyTrigger(); trig.Key != "" { // Empty trigger is defined. beware that "" is not a key
+		allowedActions = getNextTriggersNoEmptyTriggers(sm.State(), trig.Key)
 	} else {
-		allowedActions = EC2InstancesStateMachine.GetNextTriggers()
+		allowedActions = sm.GetNextTriggers()
 	}
-	for idx, optName := range instanceStatusRadioButton.GetOptions() { // TODO: urgh
+	for idx, optName := range rButton.GetOptions() { // TODO: urgh
 		enabled := false
 		for _, allowedAction := range allowedActions {
 			if allowedAction.Key == optName {
-				instanceStatusRadioButton.EnableOptionByIdx(idx)
+				rButton.EnableOptionByIdx(idx)
 				enabled = true
 				break
 			}
 		}
 		if !enabled {
-			instanceStatusRadioButton.DisableOptionByIdx(idx)
+			rButton.DisableOptionByIdx(idx)
 		}
 	}
 }

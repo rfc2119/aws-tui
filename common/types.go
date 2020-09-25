@@ -2,18 +2,17 @@ package common
 
 import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	// "github.com/aws/aws-sdk-go-v2/aws"
 )
 
-// v2 of the aws sdk is used
+// v2 of the aws go sdk is used
 
 const (
-	ACTION_INSTANCE_STATUS_UPDATE = iota // iota is a counter starting from zero
+	ACTION_INSTANCE_STATUS_UPDATE = iota
 	ACTION_INSTANCES_STATUS_UPDATE
 	ACTION_INSTANCE_HALP_ME
 
-	// defining the services themselves as numeric constants
-	// might be useful some time in the future
+	// Defining the services themselves as numeric constants
+	// Used onwards to tweak service names and configs. This will probably be replaced
 	SERVICE_EC2
     SERVICE_IAM
 

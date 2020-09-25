@@ -23,8 +23,8 @@ type mainUI struct {
 // 	*aws.Client
 // }
 
-// As usual, types.go contains some type definitions and configs
 
+// A common type used to hold keyboard keys to functions
 type inputCapturer struct {
 	// setKeyToFunc(p tview.Primitive, keyToFunc map[tcell.Key]func()){
 	keyToFunc map[tcell.Key]func()
@@ -339,7 +339,7 @@ type radioButtonOption struct {
 	name    string
 	enabled bool
 }
-type radioButtons struct {
+type RadioButtons struct {
 	*tview.Box
 	*inputCapturer
 	options       []radioButtonOption
@@ -347,12 +347,12 @@ type radioButtons struct {
 }
 
 // NewRadioButtons returns a new radio button primitive.
-func NewRadioButtons(optionNames []string) *radioButtons {
+func NewRadioButtons(optionNames []string) *RadioButtons {
 	options := make([]radioButtonOption, len(optionNames))
 	for idx, name := range optionNames {
 		options[idx] = radioButtonOption{name, true} // default: all enabled
 	}
-	r := radioButtons{
+	r := RadioButtons{
 		Box:           tview.NewBox(),
 		options:       options,
 		inputCapturer: &inputCapturer{keyToFunc: make(map[tcell.Key]func())},
@@ -362,7 +362,7 @@ func NewRadioButtons(optionNames []string) *radioButtons {
 }
 
 // Draw draws this primitive onto the screen.
-func (r *radioButtons) Draw(screen tcell.Screen) {
+func (r *RadioButtons) Draw(screen tcell.Screen) {
 	r.Box.Draw(screen)
 	x, y, width, height := r.GetInnerRect()
 
@@ -384,7 +384,7 @@ func (r *radioButtons) Draw(screen tcell.Screen) {
 }
 
 // InputHandler returns the handler for this primitive.
-func (r *radioButtons) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+func (r *RadioButtons) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
 	return r.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
 		switch {
 		case event.Key() == tcell.KeyUp, event.Rune() == 'k':
@@ -412,18 +412,18 @@ func (r *radioButtons) InputHandler() func(event *tcell.EventKey, setFocus func(
 }
 
 // Return the name of the current option
-func (r *radioButtons) GetCurrentOptionName() string {
+func (r *RadioButtons) GetCurrentOptionName() string {
 	return r.options[r.currentOption].name
 }
 
-func (r *radioButtons) GetOptions() []string {
+func (r *RadioButtons) GetOptions() []string {
 	opts := make([]string, len(r.options))
 	for idx, opt := range r.options {
 		opts[idx] = opt.name
 	}
 	return opts
 }
-func (r *radioButtons) DisableOptionByName(name string) {
+func (r *RadioButtons) DisableOptionByName(name string) {
 	for _, opt := range r.options {
 		if opt.name == name {
 			opt.enabled = false
@@ -432,14 +432,14 @@ func (r *radioButtons) DisableOptionByName(name string) {
 	}
 }
 
-func (r *radioButtons) DisableOptionByIdx(idx int) {
+func (r *RadioButtons) DisableOptionByIdx(idx int) {
 	r.options[idx].enabled = false
 }
 
-func (r *radioButtons) EnableOptionByIdx(idx int) {
+func (r *RadioButtons) EnableOptionByIdx(idx int) {
 	r.options[idx].enabled = true
 }
-func (r *radioButtons) setKeyToFunc() { // TODO: see repeated method on other types
+func (r *RadioButtons) setKeyToFunc() { // TODO: see repeated method on other types
 	r.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		uKey := event.Key()
 		if event.Rune() != 0 {

@@ -88,7 +88,7 @@ func main() {
     IAM User arn:  %20s
     Region:        %7s
 
-    Build Version: v%s
+    Build Version: %s
     SDK Name:      %7s
     SDK Version:   %-7s
     `, *currentIAMUser.UserName, *currentIAMUser.Arn, config.Region, version, aws.SDKName, aws.SDKVersion)

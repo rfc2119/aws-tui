@@ -5,19 +5,20 @@ import (
 	"github.com/gdamore/tcell"
 )
 
-type stateMachine struct {
+type EStateMachine struct {
     ssm.StateMachine
-    color   tcell.Color
+    color   tcell.Color             // On transitioning to a new state, a new color is set
     emptyTrigger ssm.Trigger        // for state machines which have intermediate states
 }
 
-func (sm *stateMachine) GetColor() tcell.Color { return sm.color }
-func (sm *stateMachine) GetEmptyTrigger() ssm.Trigger { return sm.emptyTrigger }
+func (sm *EStateMachine) GetColor() tcell.Color { return sm.color }
+func (sm *EStateMachine) GetEmptyTrigger() ssm.Trigger { return sm.emptyTrigger }
 
 
 var (
     AMIFilters = []int{FILTER_ARCHITECTURE, FILTER_OWNER_ALIAS, FILTER_NAME, FILTER_PLATFORM, FILTER_ROOT_DEVICE_TYPE, FILTER_STATE}
 
+    // states of an EC2 instance life cycle
     pendingState = ssm.State{Name: "pending"}
     runningState = ssm.State{Name: "running"}
     stoppedState = ssm.State{Name: "stopped"}
@@ -25,13 +26,55 @@ var (
     rebootingState = ssm.State{Name: "rebooting"}
     shuttingDownState = ssm.State{Name: "shutting-down"}
     terminatedState = ssm.State{Name: "terminated"}
+
+    // states of an EBS volume life cycle
+    attachedState = ssm.State{Name: "in-use"}
+    detachedState = ssm.State{Name: "available"}
+    deletingState = ssm.State{Name: "deleting"}     // next state is "deleted", which if reached, then the API for listVolumes will return nothing.
+    creatingState = ssm.State{Name: "creating"}
+
 )
 
-func NewEC2InstancesStateMachine() *stateMachine {
-    // state machine for ec2 instance lifecycle (could be done with a switch case statement)
+func NewEBSVolumeStateMachine() *EStateMachine {
+    // State machine for the life cycle of an EBS Volume
+    // Triggers (see ui/ec2 for trigger names)  TODO: unify trigger names
+    emptyTrigger := ssm.Trigger{Key: " "}       // transition to intermediate states
+    attachTrigger := ssm.Trigger{Key: "Attach"}
+    detachTrigger := ssm.Trigger{Key: "Detach"}
+    forceDetachTrigger := ssm.Trigger{Key: "Force Detach"}
+    deleteTrigger := ssm.Trigger{Key: "Delete"}
+
+    // The state machine itself (initially in the "available" state) and configs
+    EBSLifeCycle := EStateMachine {
+        StateMachine: *ssm.NewStateMachine(detachedState),
+        color: tcell.ColorDefault,
+        emptyTrigger: emptyTrigger,
+    }
+    inUseConfig := EBSLifeCycle.Configure(attachedState)
+    availableConfig := EBSLifeCycle.Configure(detachedState)
+    deletingConfig := EBSLifeCycle.Configure(deletingState)
+    creatingConfig := EBSLifeCycle.Configure(creatingState)
+
+    inUseConfig.OnEnter(func() {EBSLifeCycle.color = tcell.ColorGreen})
+    inUseConfig.Permit(detachTrigger, detachedState)
+    inUseConfig.Permit(forceDetachTrigger, detachedState)
+
+    availableConfig.OnEnter(func() {EBSLifeCycle.color = tcell.ColorBlue})
+    availableConfig.Permit(attachTrigger, attachedState)
+    availableConfig.Permit(deleteTrigger, deletingState)
+
+    deletingConfig.OnEnter(func() {EBSLifeCycle.color = tcell.ColorRed})
+    creatingConfig.OnEnter(func() {EBSLifeCycle.color = tcell.ColorYellow})
+    creatingConfig.Permit(emptyTrigger, attachedState)
+
+    return &EBSLifeCycle
+}
+
+func NewEC2InstancesStateMachine() *EStateMachine {
+    // State machine for ec2 instance lifecycle (could be done with a switch case statement)
     // reference: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-lifecycle.html
 
-    // triggers (see ui/ec2 for trigger names)  TODO: unify trigger names
+    // Triggers (see ui/ec2 for trigger names)  TODO: unify trigger names
     emptyTrigger := ssm.Trigger{Key: " "}       // transition to intermediate states
     startTrigger := ssm.Trigger{Key: "Start"}
     stopTrigger := ssm.Trigger{Key: "Stop"}
@@ -41,7 +84,7 @@ func NewEC2InstancesStateMachine() *stateMachine {
     rebootTrigger := ssm.Trigger{Key: "Reboot"}
 
     // the state machine itself (initially in the "pending" state) and configs
-    EC2LifeCycle := stateMachine{
+    EC2LifeCycle := EStateMachine{
         StateMachine: *ssm.NewStateMachine(pendingState),
         color: tcell.ColorDefault,
         emptyTrigger: emptyTrigger,          // if there's no trigger defined, set trigger.Key to ""
