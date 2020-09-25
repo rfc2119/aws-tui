@@ -1,34 +1,40 @@
-# arch
-MVC architecture. the controller is merged into the ui.
+# Architecture
+A typical Model-View architecture, where the controller logic is merged into the View (referred here to as UI). The UI has direct code access to the model, while the model can talk to the UI component through a go channel. Only one channel is established for each service. The protocol which defines the format of messages that go through the channel is defined manually. 
 
-each aws service has a type definition in the `services` namespace. for example, the ec2 service is defined as follows:
+A service is group of a model component, main view components, and service-specific data. Each aws service has a type defined in the corresponding *.go* file under the `ui` namespace. For example, the EC2 service is defined as follows:
 ```go
-
 type ec2Service struct {
-	Model   *ec2.Client		// the backend component (aws client) which fetches the data from aws
-	Service
+	mainUI
+	Model *model.EC2Model           // The underlying entity that fetches data from AWS
+
+	// service specific data
+	instances []ec2.Instance
+	volumes   []ec2.Volume
 }
 ```
-where `Service` is an embedded type defined as:
+where `mainUI` is an embedded type defined as:
 ```go
 
-	View    []viewComponent		// all the components participating in viewing the data
-	Channel chan Action		// the model to view channel
-	Name    string 			// use the convenient map to assign the correct name
+type mainUI struct {
+	// View    []viewComponent
+	MainApp   *tview.Application    // The main application instance
+	RootPage  *ePages               // The main container for switching between pages
+	StatusBar *StatusBar            // A handy status bar
+}
 ```
-the `View` is a slice of all the ui components particiapting in the service (TODO: not sure yet). the first element should always be a `tview.Application` and the second should be the root element (here we use a `tview.Pages`). both elements are needed mainly for switching purposes (switching pages, switching focus, ... etc.)
+In addition to `mainUI`, file *types.go* in the `ui` namespace defines custom types based on the `tview` package. In general, these types register common key bindings and extra methods to help group common behavior. 
 
-## view
-the view (ui) has direct access to the model namespace (i.e code access). it requests data from the model and display it
+## View
+The view (UI) has direct access to the model namespace (i.e code access). it requests data from the model and display it. In addition to one-time requests, it listens to data changes on a go channel (the service channel). To activate listeners, invoke the `WatchChanges()` method for each service
 
-## model
-a go channel is established between the model and the view. through this channel, the model is allowed to send periodic updates to the view to update items accordingly. the exchange protocol is specified manually through type definitions. the general type to be sent over the channel is:
+## Model
+A go channel is established between the model and the view. Through this channel, the model is allowed to send periodic updates to the view to update items accordingly. The exchange protocol is specified manually through type definitions. The general type to be sent over the channel is:
 ```go
 type Action struct {
 	Type int
 	Data       interface{}
 }
 ``` 
-the `Data` differs in each message. see *services/types.go* for definitions.
+The `Data` differs in each message and is defined manually for each action. After receiving a message, the UI component also acts appropriately. See *common/types.go* for definitions of example actions.
 
 the view must explicitly call the `watch` method of a service with a given channel to receive updates from the model on the channel

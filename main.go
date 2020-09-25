@@ -1,17 +1,32 @@
 package main
 
 import (
-	// "context"
+	// "context"        // TODO
 	"fmt"
 	"rfc2119/aws-tui/common"
 	"rfc2119/aws-tui/ui"
 
-	// "github.com/gdamore/tcell"
 	"github.com/rivo/tview"
 	"github.com/aws/aws-sdk-go-v2/aws/external"
 	"github.com/aws/aws-sdk-go-v2/aws"
 )
 
+const (
+    MAIN_HELP_MSG =
+`Welcome to the unofficial AWS Terminal Interface. This is a very much work-in-progress and I appreciate your feedback, issues, code improvements, ... etc. Please submit them at https://github.com/rfc2119/aws-tui
+
+Common keys found across all windows:
+
+	TAB             Move to neighboring windows
+	?               View help messages (if available)
+	q               Move back one page (will exit this help message)
+    Space           Select Option in a radio box/tree view (except in a confirmation box)
+
+Use Ctrl-C to exit the application
+`
+    version = "0.1"     // TODO: git commit's SHA added to the built binary
+
+)
 
 func main() {
 
@@ -36,7 +51,7 @@ func main() {
 
 	// ui elements
 	mainContainer := tview.NewFlex() // a flex container for the status bar and application pages/window
-    frontPage := tview.NewFlex()    // the front page which holds the info and tree view
+    frontPage := ui.NewEFlex(pages)    // the front page which holds the info and tree view
     info := tview.NewTextView()
 	tree := tview.NewTreeView()
 
@@ -73,21 +88,24 @@ func main() {
     IAM User arn:  %20s
     Region:        %7s
 
-    Build Version: HALP
+    Build Version: v%s
     SDK Name:      %7s
     SDK Version:   %-7s
-    `, *currentIAMUser.UserName, *currentIAMUser.Arn, config.Region, aws.SDKName, aws.SDKVersion)
+    `, *currentIAMUser.UserName, *currentIAMUser.Arn, config.Region, version, aws.SDKName, aws.SDKVersion)
 
 	// ui config
 	tree.SetRoot(rootNode)
 	tree.SetCurrentNode(rootNode)
 
+    frontPage.HelpMessage = MAIN_HELP_MSG
 	frontPage.SetDirection(tview.FlexColumn)
     frontPage.AddItem(tree, 0, 3, true)
     frontPage.AddItem(info, 0, 2, false)
+
 	mainContainer.SetDirection(tview.FlexRow).SetFullScreen(true)
 	mainContainer.AddItem(pages, 0, 107, true)    //AddItem(item Primitive, fixedSize, proportion int, focus bool)
 	mainContainer.AddItem(statusBar, 0, 1, false) // 107:1 seems fair ?
+
 	pages.EAddPage("Services", frontPage, true, true)  // EAddPage(name string, item tview.Primitive, resize, visible bool)
     statusBar.SetText("Welcome to the terminal interface for AWS. Type '?' to get help")
 	if err := app.SetRoot(mainContainer, true).SetFocus(mainContainer).Run(); err != nil {

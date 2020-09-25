@@ -12,12 +12,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 )
 
-// each channel is concerned with a service, and only the view to the model may use the channel. for example, for a designated ec2 worker channel, only the view responsible for ec2 may listen to the channel and consume items
+// Each channel is concerned with a service, and only the view to the model may use the channel. for example, for a designated ec2 worker channel, only the view responsible for ec2 may listen to the channel and consume items
 // this might break in the future. sometimes, multiple benefeciaries exist for a single work. for example, when deleting an ebs volume, the ec2 console should also make use of the deletion command/action to update the affected instance. i don't know how to approach this (yet)
 type EC2Model struct {
 	model *ec2.Client
-	Channel chan common.Action // channel from model to view (see above)
-	Name    string             // use the convenient map to assign the correct name
+	Channel chan common.Action // Unbuffered channel from model to view (see above)
+	Name    string             // Use the convenient map to assign the correct name
 	// logger	log.Logger
 
 }
@@ -37,7 +37,6 @@ func (mdl *EC2Model) StartEC2Instance(instanceIds []string) []ec2.InstanceStateC
     })
 	resp, err := req.Send(context.TODO())
     printAWSError(err)      // TODO: graceful error handling
-	// return resp.InstanceTypeOfferings // TODO: paginator
     return resp.StartingInstances
 }
 
@@ -49,7 +48,6 @@ func (mdl *EC2Model) StopEC2Instance(instanceIds []string, force, hibernate bool
     })
 	resp, err := req.Send(context.TODO())
     printAWSError(err)      // TODO: graceful error handling
-	// return resp.InstanceTypeOfferings // TODO: paginator
     return resp.StoppingInstances
 
 }
@@ -84,17 +82,15 @@ func (mdl *EC2Model) GetEC2Instances() []ec2.Instance {
 	return instances
 }
 
-// lists all instance types offered
+// Lists all instance types offered in the default region
 func (mdl *EC2Model) ListOfferings() []ec2.InstanceTypeOffering { // TODO: region, filters
 	req := mdl.model.DescribeInstanceTypeOfferingsRequest(&ec2.DescribeInstanceTypeOfferingsInput{})
 	resp, err := req.Send(context.TODO())
-	if err != nil { // TODO: graceful error handling
-		log.Println(err)
-	}
-	return resp.InstanceTypeOfferings // TODO: paginator
+    printAWSError(err)      // TODO: graceful error handling
+	return resp.InstanceTypeOfferings
 }
 
-// lists AMIs offered
+// Lists AMIs offered
 func (mdl *EC2Model) ListAMIs(filterMap map[string]string) []ec2.Image {
 	// TODO: assert length
 	var filters []ec2.Filter
@@ -110,6 +106,16 @@ func (mdl *EC2Model) ListAMIs(filterMap map[string]string) []ec2.Image {
 	return resp.Images
 }
 
+// Changes instance type (or resize) to instType. For the restrictions on resizing an instance, see https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-resize.html
+func (mdl *EC2Model) ChangeInstanceType(instId, instType string) {
+    req := mdl.model.ModifyInstanceAttributeRequest(&ec2.ModifyInstanceAttributeInput{
+        InstanceId: aws.String(instId),
+        InstanceType: &ec2.AttributeValue{Value: aws.String(instType)},
+    })
+	_, err := req.Send(context.TODO())
+    printAWSError(err)      // TODO: graceful error handling
+    // return resp.ModifyInstanceAttributeOutput         // an empty struct is returned
+}
 func (mdl *EC2Model) ListVolumes() []ec2.Volume {
 	var (
         volumes []ec2.Volume
@@ -123,7 +129,7 @@ func (mdl *EC2Model) ListVolumes() []ec2.Volume {
     printAWSError(paginator.Err())      // TODO: graceful error handling
 	return volumes
 }
-// TODO: i don't understand why this is better than a simple print
+// TODO: I don't understand yet why this is better than a simple print
 func printAWSError(err error) error {
     if err != nil {
         if aerr, ok := err.(awserr.Error); ok {
@@ -139,10 +145,11 @@ func printAWSError(err error) error {
     }
     return err
 }
+
 // DispatchWatchers sets the appropriate timer and calls each watcher
 func (mdl *EC2Model) DispatchWatchers() {
 	ticker := time.NewTicker(5 * time.Second) // TODO: 5
-	// i parametrized the goroutine only to make the channel send only
+	// I parametrized the goroutine only to make the channel send only
 	go func(t *time.Ticker, ch chan<- common.Action, client *ec2.Client) { // dispatcher goroutine
 		for {
 			<-t.C
@@ -152,10 +159,8 @@ func (mdl *EC2Model) DispatchWatchers() {
 	}(ticker, mdl.Channel, mdl.model)
 }
 
-// TODO: not sure this is the best way to do this watcher/listner combo
+// watcher1 watches the status of all EC2 instances. A similar function in the view component "listner1" should make use of this information
 func watcher1(client *ec2.Client, ch chan<- common.Action, describeAll bool) {
-	// mdl.watchers = append(mdl.watchers, watcher)
-
 	req := client.DescribeInstanceStatusRequest(&ec2.DescribeInstanceStatusInput{
 		IncludeAllInstances: &describeAll,
 	})

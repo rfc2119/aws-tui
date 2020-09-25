@@ -10,11 +10,6 @@ import (
 	"github.com/rivo/tview"
 )
 
-// type viewComponent struct {
-// 	ID      string           // unique id for the component; assigned as the address of the actual ui element
-// 	Service string           // which service does this component serve ? see below for defintion of services
-// 	Element tview.Primitive // the ui element itself. Primitive is an interface
-// }
 type mainUI struct {
 	// View    []viewComponent
 	MainApp   *tview.Application
@@ -22,17 +17,13 @@ type mainUI struct {
 	StatusBar *StatusBar
 }
 
-// services themselves are a way to group a model (the backend sdk) and the corresponding view. i don't know what will be the view as of this moment, but here goes nothing
-// each service has a structure defined in the corresponding .go file
-// a general representation of a model and view
 // TODO: generalize services as a structure
 // type service struct {
 // 	*mainUI
 // 	*aws.Client
 // }
 
-// as usual, types.go contains some type definitions and configs
-// exported methods of names similar to the original ui elements (from tview package) are prefixed with the vowel 'E' (capital E) for no reason. similarily, 'e' prefixes the custom ui elements defined
+// As usual, types.go contains some type definitions and configs
 
 type inputCapturer struct {
 	// setKeyToFunc(p tview.Primitive, keyToFunc map[tcell.Key]func()){
@@ -65,6 +56,8 @@ func (i *inputCapturer) UpdateKeyToFunc(keyToF map[tcell.Key]func()) {
 //         })
 //     }
 // }
+
+// Exported methods of names similar to the original ui elements (from tview package) are prefixed with the vowel 'E' (capital E) for no reason. Similarily, 'e' prefixes the custom ui elements defined
 // =================================
 // ePages definition and methods
 type ePages struct {
@@ -112,7 +105,7 @@ func (p *ePages) EAddPage(name string, item tview.Primitive, resize, visible boo
 
 }
 
-// use to go forward one page. do not use it if you intend not to go back to the page (for confirmation boxes for example). instead, use the normal tview.SwitchToPage or tview.AddAndSwitchToPage
+// Use this to go forward one page. Do not use it if you intend not to go back (confirmation boxes for example). Instead, use the normal tview.SwitchToPage or tview.AddAndSwitchToPage
 func (p *ePages) ESwitchToPage(name string) *ePages {
 	currentPageName, _ := p.GetFrontPage()
 	p.pageStack = append(p.pageStack, currentPageName)
@@ -127,7 +120,7 @@ func (p *ePages) EAddAndSwitchToPage(name string, item tview.Primitive, resize b
 
 }
 
-// use to move backward one page
+// Use this to move backward one page
 func (p *ePages) ESwitchToPreviousPage() *ePages {
 	if len(p.pageStack) > 0 {
 		p.SwitchToPage(p.pageStack[len(p.pageStack)-1])
@@ -137,11 +130,11 @@ func (p *ePages) ESwitchToPreviousPage() *ePages {
 	return p
 }
 
-// no nested help messages
+// Displays the help message given. Note that there should be no nested help messages
 func (p *ePages) DisplayHelpMessage(msg string) *ePages {
 	helpPage := tview.NewTextView()
 	// helpPage.SetBackgroundColor(tcell.ColorBlue)
-	helpPage.SetTitle("HALP ME").SetTitleAlign(tview.AlignCenter).SetBorder(true)
+	helpPage.SetTitle("Help").SetTitleAlign(tview.AlignCenter).SetBorder(true)
 	helpPage.SetText(msg)
 	return p.EAddAndSwitchToPage("help", helpPage, true) // "help" page gets overriden each time; resizable=true
 }
@@ -191,7 +184,7 @@ func (f *eFlex) DisplayHelp() {
 	f.parent.DisplayHelpMessage(f.HelpMessage)
 }
 
-// if only we can shift focus to grid/flex members without a tview.Application...
+// If only we can shift focus to grid/flex members without a tview.Application...
 func (f *eFlex) SetShiftFocusFunc(app *tview.Application) {
 	f.UpdateKeyToFunc(map[tcell.Key]func(){
 		tcell.KeyTab: func() {
@@ -257,6 +250,7 @@ func NewEgrid(parentPages *ePages) *eGrid {
 	g.setKeyToFunc()
 	return &g
 }
+// Wrapper function around tview.Grid.AddItem
 func (g *eGrid) EAddItem(p tview.Primitive, row, column, rowSpan, colSpan, minGridHeight, minGridWidth int, focus bool) *eGrid {
 
 	g.AddItem(p, row, column, rowSpan, colSpan, minGridHeight, minGridWidth, focus)
@@ -268,7 +262,7 @@ func (g *eGrid) DisplayHelp() {
 	g.parent.DisplayHelpMessage(g.HelpMessage)
 }
 
-// if only we can shift focus to grid/flex members without a tview.Application...
+// If only we can shift focus to grid/flex members without a tview.Application...
 func (g *eGrid) SetShiftFocusFunc(app *tview.Application) {
 	g.UpdateKeyToFunc(map[tcell.Key]func(){
 		tcell.KeyTab: func() {
@@ -417,7 +411,7 @@ func (r *radioButtons) InputHandler() func(event *tcell.EventKey, setFocus func(
 	})
 }
 
-// return the name of the current option
+// Return the name of the current option
 func (r *radioButtons) GetCurrentOptionName() string {
 	return r.options[r.currentOption].name
 }
@@ -462,7 +456,7 @@ func (r *radioButtons) setKeyToFunc() { // TODO: see repeated method on other ty
 }
 
 // ====================
-// status bar
+// A non-focusable status bar
 type StatusBar struct {
 	*tview.TextView
 	durationInSeconds int // duration after which the status bar is  cleared
@@ -474,7 +468,7 @@ func NewStatusBar() *StatusBar {
 		TextView:          tview.NewTextView(),
 		durationInSeconds: 3, // TODO: parameter
 	}
-	// very naiive way of clearing the text bar on regular intervals; no syncronization or context is used
+    // TODO: this is a naiive way of clearing the text bar on regular intervals; no syncronization or context is used
 	bar.SetChangedFunc(func() {
 		time.Sleep(time.Duration(bar.durationInSeconds) * time.Second)
 		bar.Clear()
@@ -482,7 +476,7 @@ func NewStatusBar() *StatusBar {
 	return &bar
 }
 
-// non-focusable status bar by ignoring all key events and directing Focus() away
+// Non-focusable status bar by ignoring all key events and directing Focus() away
 func (bar *StatusBar) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
 	return nil
 }
@@ -492,7 +486,7 @@ func (bar *StatusBar) Focus(delegate func(p tview.Primitive)) {
 }
 
 // helper functions
-// quite silly function (TODO: probably refactor)
+// Grabs a string representation from types returned by the model (TODO: probably refactor)
 func stringFromAWSVar(awsVar interface{}) string {
 	var t string
 	switch v := awsVar.(type) {
@@ -515,29 +509,6 @@ func stringFromAWSVar(awsVar interface{}) string {
 			t = ""
 		}
 	}
-	return t
+    return t        // TODO: return error on failure
 }
 
-// TODO: initially i did this to avoid writing similar functions for the same keys. i think this should be more generalized. also, is this slower than a big jump table (i.e switch/case statement) ?
-// func setKeyToFunc(i interface{}){
-//     // TODO: unify into one type
-//     switch b := i.(type){
-//     case *eFlex, *eGrid, *eTabel, *RadioButtons:
-//     b.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-//         uKey := event.Key()
-//         if event.Rune() != 0 {
-//             uKey = tcell.Key(event.Rune())
-//         }
-//         for k, f := range b.keyToFunc{
-//             if k == uKey {
-//                 f()
-//                 break
-//             }
-//         }
-//         return event
-//     })
-// default:
-//     fmt.Println("NOT IMPLEMENTED")
-// }
-//
-// }
