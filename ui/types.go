@@ -545,6 +545,8 @@ func stringFromAWSVar(awsVar interface{}) string {
 		// conversion from int to string yields a string of one rune,
 		// not a string of digits (did you mean fmt.Sprint(x)?)
 		t = fmt.Sprint(aws.Int64Value(v)) // hmmmm
+    case *time.Time:
+        t = fmt.Sprint(aws.TimeValue(v))
 	default:
 		switch reflect.TypeOf(v).Kind() {
 		case reflect.String: // should be a type derived from string ?

@@ -32,6 +32,13 @@ const (
 	COL_EBS_IOPS
 	COL_EBS_STATE
 )
+
+const (
+    COL_EBS_VOL_INSTANCE_ID = iota
+    COL_EBS_VOL_STATE
+    COL_EBS_VOL_DEVICE_NAME
+    COL_EBS_VOL_DATA_ATTACHED
+)
 const (
 	HELP_EC2_MAIN = `
 	d               Describe instance
@@ -64,6 +71,7 @@ var (
 	inputFieldVolumeSize    = tview.NewInputField()                                                   // Component in "Edit volumes"
 	inputFieldVolumeIops    = tview.NewInputField()                                                   // Component in "Edit volumes"
 	radioButtonVolumeStatus = NewRadioButtons([]string{"Attach", "Detach", "Force Detach", "Delete"}) // Component in "Edit volumes"
+	tableEditVolume         = NewEtable()
 	EBSVolumesStateMachine  = common.NewEBSVolumeStateMachine()
 )
 
@@ -137,17 +145,21 @@ func (ec2svc *ec2Service) InitView() {
 	dropDownVolumeType.SetOptions([]string{"Magnetic (standard)", "General Purpose SSD (gp2)", "Provisioned IOPS SSD (io1)", "Provisioned IOPS SSD (io2)"}, nil)
 	gridEditVolume.SetBorders(true).SetTitle("Test") // Not working :(
 
-	gridEditVolume.SetRows(3, 3)
-	gridEditVolume.SetColumns(1, 0, 0, 1)
-	gridEditVolume.EAddItem(dropDownVolumeType, 0, 1, 1, 1, 0, 0, true) // row, col, rowSpan, colSpan, minGridHeight, minGridWidth, focus
-	gridEditVolume.EAddItem(inputFieldVolumeSize, 1, 1, 1, 1, 0, 0, false)
-	gridEditVolume.EAddItem(radioButtonVolumeStatus, 0, 2, 2, 2, 0, 0, false)
+	tableEditVolume.SetBorders(false)
+	tableEditVolume.SetSelectable(true, false)
+	tableEditVolume.Select(1, 1)
+	tableEditVolume.SetFixed(0, 2)
+
+	gridEditVolume.SetRows(3, 3, 0)
+	gridEditVolume.SetColumns(10, 0, 20)
+	gridEditVolume.EAddItem(dropDownVolumeType, 0, 0, 1, 2, 0, 0, true) // row, col, rowSpan, colSpan, minGridHeight, minGridWidth, focus
+	gridEditVolume.EAddItem(inputFieldVolumeSize, 1, 0, 1, 2, 0, 0, false)
+	gridEditVolume.EAddItem(radioButtonVolumeStatus, 0, 2, 2, 1, 0, 0, false) // TODO: iops
+	gridEditVolume.EAddItem(tableEditVolume, 2, 0, 1, 3, 20, 40, false)
 	gridEditVolume.SetShiftFocusFunc(ec2svc.MainApp)
 
 	ec2svc.RootPage.EAddPage("Instances", instancesFlex, true, false) // TODO: page names and such; resize=true, visible=false
-	// ec2svc.RootPage.EAddPage("Edit Instance", editInstancesGrid, true, false) // TODO: page names and such
 	ec2svc.RootPage.EAddPage("Volumes", volumesFlex, true, false) // TODO: page names and such; resize=true, visible=false
-	// ec2svc.RootPage.EAddPage("Edit Volume", gridEditVolume, true, false)     // TODO: page names and such
 
 	ec2svc.WatchChanges()
 
@@ -195,7 +207,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 			configureRadioButton(instanceStatusRadioButton, EC2InstancesStateMachine)
 			// TODO: configure the "instance type" drop down
 			// editInstancesGrid.SetTitle(instancesTable.GetCell(row, COL_EC2_ID).Text) //TODO
-			ec2svc.showGenericModal(editInstancesGrid, 40, 40)
+			ec2svc.showGenericModal(editInstancesGrid, 40, 80)
 		},
 		tcell.Key('r'): func() {
 			ec2svc.StatusBar.SetText("refreshing instances list")
@@ -291,14 +303,62 @@ func (ec2svc *ec2Service) setCallbacks() {
 			inputFieldVolumeIops.SetText(volumesTable.GetCell(row, COL_EBS_IOPS).Text) //TODO: put in main screen
 			inputFieldVolumeSize.SetText(volumesTable.GetCell(row, COL_EBS_SIZE).Text)
 			// dropDownVolumeType.SetIndex()       // TODO
-			ec2svc.showGenericModal(gridEditVolume, 50, 10)
+			// Drawing the tableEditVolume       // TODO: generalize
+			colNames := []string{"Instance ID", "State", "Device", "Date Attached"} // TODO
+			for firstColIdx := 0; firstColIdx < len(colNames); firstColIdx++ {
+				tableEditVolume.SetCell(0, firstColIdx,
+					tview.NewTableCell(colNames[firstColIdx]).SetAlign(tview.AlignCenter).SetSelectable(false).SetAttributes(tcell.AttrBold))
+			}
+			for rowIdx, info := range ec2svc.volumes[row-1].Attachments {
+				items := []interface{}{info.InstanceId, info.State, info.Device, info.AttachTime}
+				for colIdx, item := range items {
+					cell := tview.NewTableCell(stringFromAWSVar(item))
+					tableEditVolume.SetCell(rowIdx+1, colIdx, cell)
+				}
+			}
+            tableEditVolume.SetSelectionChangedFunc(func(row, col int){
+                state := ssm.State{Name: volumesTable.GetCell(row, COL_EBS_STATE).Text}
+                if err := EBSVolumesStateMachine.GoToState(state, false); err != nil {
+                    log.Println(err)
+                    return
+                }
+                configureRadioButton(radioButtonVolumeStatus, EBSVolumesStateMachine)
+            })
+			ec2svc.showGenericModal(gridEditVolume, 50, 20)
 		},
 	}
 	volumesTable.UpdateKeyToFunc(volumesTableCallBacks)
 	radioButtonVolumeStatusCallbacks := map[tcell.Key]func(){
 		tcell.Key(' '): func() {
+			currOpt := radioButtonVolumeStatus.GetCurrentOptionName()
+			msg := fmt.Sprintf("%s volume ?", currOpt)
+			ec2svc.showConfirmationBox(msg, func() {
+				// ec2svc.StatusBar.SetText(fmt.Sprintf("%#v", test))
+				row, _ := tableEditVolume.GetSelection()
+                instanceId := tableEditVolume.GetCell(row, COL_EBS_VOL_INSTANCE_ID).Text
+                devName := tableEditVolume.GetCell(row, COL_EBS_VOL_DEVICE_NAME).Text
+				row, _ = volumesTable.GetSelection()
+                volId := volumesTable.GetCell(row, COL_EBS_ID).Text
+				switch currOpt{
+                case "Attach":
+                    ec2svc.showConfirmationBox("TODO!", nil)
+                    // if _, err := ec2svc.Model.AttachVolume(volId, instanceId, devName); err != nil{
+                    //     ec2svc.showConfirmationBox(err.Error(), nil)
+                    // }
+                case "Force Detach":
+                    if _, err := ec2svc.Model.DetachVolume(volId, instanceId, devName, false); err != nil{
+                        ec2svc.showConfirmationBox(err.Error(), nil)
+                    }
+                case "Detach":
+                    if _, err := ec2svc.Model.DetachVolume(volId, instanceId, devName, false); err != nil{
+                        ec2svc.showConfirmationBox(err.Error(), nil)
+                    }
+                case "Delete":       // TODO
+                    ec2svc.showConfirmationBox("TODO!", nil)
+                }
+            })
+
 		},
-		// TODO
 	}
 	radioButtonVolumeStatus.UpdateKeyToFunc(radioButtonVolumeStatusCallbacks)
 
@@ -363,7 +423,7 @@ func (ec2svc *ec2Service) chooseAMIFilters() {
 		}
 		instancesTableAMI := tview.NewTable()
 
-		// Drawing the instancesTable
+		// Drawing the instancesTable       // TODO: generalize
 		colNames := []string{"ID", "State", "Arch", "Creation Date", "Name", "Owner ID"} // TODO
 		for firstColIdx := 0; firstColIdx < len(colNames); firstColIdx++ {
 			instancesTableAMI.SetCell(0, firstColIdx,

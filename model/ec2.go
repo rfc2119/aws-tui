@@ -141,6 +141,32 @@ func (mdl *EC2Model) ListVolumes() ([]ec2.Volume, error) {
     }
 	return volumes, paginator.Err()
 }
+func (mdl *EC2Model) AttachVolume(volId, instId, dev string) (ec2.AttachVolumeOutput, error) {
+    req := mdl.model.AttachVolumeRequest(&ec2.AttachVolumeInput{
+        Device: aws.String(dev),
+        InstanceId: aws.String(instId),
+        VolumeId: aws.String(volId),
+    })
+	resp, err := req.Send(context.TODO())
+    if err != nil {
+        return ec2.AttachVolumeOutput{}, err
+    }
+    return *resp.AttachVolumeOutput, nil
+}
+
+func (mdl *EC2Model) DetachVolume(volId, instId, dev string, force bool) (ec2.DetachVolumeOutput, error) {
+    req := mdl.model.DetachVolumeRequest(&ec2.DetachVolumeInput{
+        Device: aws.String(dev),
+        Force: aws.Bool(force),
+        InstanceId: aws.String(instId),
+        VolumeId: aws.String(volId),
+    })
+	resp, err := req.Send(context.TODO())
+    if err != nil {
+        return ec2.DetachVolumeOutput{}, err
+    }
+    return *resp.DetachVolumeOutput, nil
+}
 // TODO: I don't understand yet why this is better than a simple print
 func  printAWSError(err error) error {
     if err != nil {
