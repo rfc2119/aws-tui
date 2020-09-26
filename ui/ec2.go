@@ -162,7 +162,14 @@ func (ec2svc *ec2Service) drawElements() {
 	ec2svc.fillVolumesTable()
 
     // Instance types allowed in current region
-	offerings := ec2svc.Model.ListOfferings()
+	var (
+		offerings []ec2.InstanceTypeOffering
+		err error
+	)
+	if offerings, err = ec2svc.Model.ListOfferings(); err != nil {
+		ec2svc.StatusBar.SetText(err.Error())
+        return
+	}
 	opts := make([]string, len(offerings))
 	for idx := 0; idx < len(offerings); idx++ {
 		opts[idx] = string(offerings[idx].InstanceType)
@@ -215,24 +222,42 @@ func (ec2svc *ec2Service) setCallbacks() {
 			msg := fmt.Sprintf("%s instance ?", currOpt)
 			ec2svc.showConfirmationBox(msg, func() {
 				// ec2svc.StatusBar.SetText(fmt.Sprintf("%#v", test))
-				ec2svc.StatusBar.SetText(fmt.Sprintf("%sing instance", currOpt))
 				row, _ := instancesTable.GetSelection() // TODO: multi selection
 				instanceIds := []string{instancesTable.GetCell(row, COL_EC2_ID).Text}
-                log.Println(instanceIds)
 				switch strings.ToLower(currOpt) { // TODO: do something w/ return value
 				case "start": // TODO: magic names
-					ec2svc.Model.StartEC2Instances(instanceIds)
+					if _, err := ec2svc.Model.StartEC2Instances(instanceIds); err != nil {
+                        ec2svc.showConfirmationBox(err.Error(), nil) // TODO: spread
+						// ec2svc.StatusBar.SetText(err.Error())	// TODO: logging
+                        return
+					}
 				case "stop":
-					ec2svc.Model.StopEC2Instances(instanceIds, false, false)
+					if _, err := ec2svc.Model.StopEC2Instances(instanceIds, false, false); err != nil {
+						// ec2svc.StatusBar.SetText(err.Error())	// TODO: logging
+                        return
+					}
 				case "hibernate":
-					ec2svc.Model.StopEC2Instances(instanceIds, false, true) // hibernate=true
+					if _, err := ec2svc.Model.StopEC2Instances(instanceIds, false, true); err != nil { // hibernate=true
+						// ec2svc.StatusBar.SetText(err.Error())	// TODO: logging
+                        return
+					}
 				case "stop (force)":
-					ec2svc.Model.StopEC2Instances(instanceIds, true, false) // force=true
+					if _, err := ec2svc.Model.StopEC2Instances(instanceIds, true, false) ; err != nil { // force=true
+						// ec2svc.StatusBar.SetText(err.Error())	// TODO: logging
+                        return
+					}
 				case "reboot":
-					ec2svc.Model.RebootEC2Instances(instanceIds)
+					if err := ec2svc.Model.RebootEC2Instances(instanceIds); err != nil {
+						// ec2svc.StatusBar.SetText(err.Error())	// TODO: logging
+                        return
+					}
 				case "terminate":
-					ec2svc.Model.TerminateEC2Instances(instanceIds)
+					if _, err := ec2svc.Model.TerminateEC2Instances(instanceIds); err != nil {
+						// ec2svc.StatusBar.SetText(err.Error())	// TODO: logging
+                        return
+					}
 				}
+				ec2svc.StatusBar.SetText(fmt.Sprintf("%sing instance", currOpt))
 			})
 		},
 	}
@@ -248,7 +273,9 @@ func (ec2svc *ec2Service) setCallbacks() {
                 ec2svc.StatusBar.SetText("Cannot change instance type: instance is not in the stopped state")
                 return
             }
-            ec2svc.Model.ChangeInstanceType(instancesTable.GetCell(row, COL_EC2_ID).Text, text)
+            if err := ec2svc.Model.ChangeInstanceType(instancesTable.GetCell(row, COL_EC2_ID).Text, text); err != nil {
+                ec2svc.StatusBar.SetText(err.Error())
+            }
         })
 	})
 
@@ -329,7 +356,13 @@ func (ec2svc *ec2Service) chooseAMIFilters() {
 	buttonCancelFunc := func() { ec2svc.RootPage.ESwitchToPreviousPage() }
 	buttonSaveFunc := func() {
 		ec2svc.StatusBar.SetText("Grabbing the list of AMIs")
-		amis := ec2svc.Model.ListAMIs(filters)
+		var (
+			amis []ec2.Image
+			err error
+		)
+		if amis, err = ec2svc.Model.ListAMIs(filters); err != nil {
+			ec2svc.StatusBar.SetText(err.Error())
+		}
 		instancesTableAMI := tview.NewTable()
 
 		// Drawing the instancesTable
@@ -365,54 +398,16 @@ func (ec2svc *ec2Service) chooseAMIFilters() {
 	ec2svc.showGenericModal(form, 80, 10) // 80x10 seems good for my screen
 }
 
-// Shows a generic modal box (rather than a confirmation-only box) centered at screen
-// Props to skanehira from the docker tui "docui" for this! code is at github.com/skanehira/docui
-func (ec2svc *ec2Service) showGenericModal(p tview.Primitive, width, height int) {
-	var centeredModal *eGrid
-	// unfortunately you can't access grid's minumum width or height. what to do ?
-	// if g, ok := p.(*eGrid); ok {    // TODO: grid inside centered grid correctly; tview.Grid
-	//     centeredModal = g
-	// log.Println("OUR GRID")
-	// // trying a flex instead
-	// centeredModal := NewEFlex(ec2svc.RootPage).SetFullScreen(false).AddItem(
-	//     tview.NewFlex().SetDirection(tview.FlexColumn).AddItem(p, width, 0, true),
-	//     height, 0, true)
-	// centeredModal.SetColumns(0, width, 0).
-	//                 SetRows(0, height, 0)
-	// } else {
-	centeredModal = NewEgrid(ec2svc.RootPage)
-	centeredModal.SetColumns(0, width, 0).
-		SetRows(0, height, 0).
-		AddItem(p, 1, 1, 1, 1, 0, 0, true) // focus=true
-		// }
-	currPageName := ec2svc.RootPage.GetCurrentPageName()
-	ec2svc.RootPage.EAddAndSwitchToPage("centered modal", centeredModal, true) // resize=true
-	ec2svc.RootPage.ShowPage(currPageName)                                     // redraw on top (bottom ?) of the box
 
-}
-
-// Shows a modal box with msg and switches back to previous page. This is useful for one-off usage (no nested boxes)
-func (ec2svc *ec2Service) showConfirmationBox(msg string, doneFunc func()) {
-	modal := tview.NewModal().
-		SetText(msg).
-		AddButtons([]string{"Ok", "Cancel"}).
-		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
-			// selectedButtonLabel = aws.String(buttonLabel)
-			if buttonLabel == "Ok" && doneFunc != nil {
-				doneFunc()
-			}
-			ec2svc.RootPage.ESwitchToPreviousPage()
-	        ec2svc.RootPage.ShowPage(ec2svc.RootPage.GetPreviousPageName()) // +1
-		})
-	ec2svc.RootPage.EAddAndSwitchToPage("modal", modal, false)      // resize=false
-	ec2svc.RootPage.ShowPage(ec2svc.RootPage.GetPreviousPageName()) // +1
-}
 
 // TODO: refactor
 // Fills the table for EBS volumes with volume data
 func (ec2svc *ec2Service) fillVolumesTable() {
+    var err error
 	colNames := []string{"ID", "Size (GiB)", "Type", "IOPS", "State"} // TODO
-	ec2svc.volumes = ec2svc.Model.ListVolumes()
+	if ec2svc.volumes, err = ec2svc.Model.ListVolumes(); err != nil {
+		ec2svc.StatusBar.SetText(err.Error())
+	}
 	for firstColIdx := 0; firstColIdx < len(colNames); firstColIdx++ {
 		volumesTable.SetCell(0, firstColIdx,
 			tview.NewTableCell(colNames[firstColIdx]).SetAlign(tview.AlignCenter).SetSelectable(false).SetAttributes(tcell.AttrBold))
@@ -432,9 +427,12 @@ func (ec2svc *ec2Service) fillVolumesTable() {
 
 // Fills the table for EC2 instances with instance data
 func (ec2svc *ec2Service) fillInstancesTable() {
-
+	var err error
     colNames := []string{"ID", "AMI", "Type", "State"} // TODO: magic
-	ec2svc.instances = ec2svc.Model.GetEC2Instances()  // directly invokes a method on the model
+
+	if ec2svc.instances, err = ec2svc.Model.GetEC2Instances(); err != nil {  // directly invokes a method on the model
+		ec2svc.StatusBar.SetText(err.Error())
+	}
 	for firstColIdx := 0; firstColIdx < len(colNames); firstColIdx++ {
 		instancesTable.SetCell(0, firstColIdx,
 			tview.NewTableCell(colNames[firstColIdx]).SetAlign(tview.AlignCenter).SetSelectable(false).SetAttributes(tcell.AttrBold))

@@ -2,7 +2,6 @@ package model
 
 import (
 	"context"
-    "fmt"
 	"log"
     "strings"
 	"rfc2119/aws-tui/common"
@@ -31,44 +30,50 @@ func NewEC2Model(config aws.Config) *EC2Model {
 	}
 }
 
-func (mdl *EC2Model) StartEC2Instances(instanceIds []string) []ec2.InstanceStateChange{
+func (mdl *EC2Model) StartEC2Instances(instanceIds []string) ([]ec2.InstanceStateChange, error){
 
 	req := mdl.model.StartInstancesRequest(&ec2.StartInstancesInput{
         InstanceIds: instanceIds,
     })
 	resp, err := req.Send(context.TODO())
-    // printAWSError(err)      // TODO: graceful error handling
-    return resp.StartingInstances
+    if err != nil {
+        return nil, err
+    }
+    return resp.StartingInstances, err
 }
 
-func (mdl *EC2Model) StopEC2Instances(instanceIds []string, force, hibernate bool)[]ec2.InstanceStateChange {
+func (mdl *EC2Model) StopEC2Instances(instanceIds []string, force, hibernate bool) ([]ec2.InstanceStateChange, error) {
 	req := mdl.model.StopInstancesRequest(&ec2.StopInstancesInput{
         InstanceIds: instanceIds,
         Hibernate: aws.Bool(hibernate),
         Force: aws.Bool(force),
     })
 	resp, err := req.Send(context.TODO())
-    // printAWSError(err)      // TODO: graceful error handling
-    return resp.StoppingInstances
+    if err != nil {
+        return nil, err
+    }
+    return resp.StoppingInstances, err
 
 }
-func (mdl *EC2Model) RebootEC2Instances(instanceIds []string){
+func (mdl *EC2Model) RebootEC2Instances(instanceIds []string) error {
 	req := mdl.model.RebootInstancesRequest(&ec2.RebootInstancesInput{
         InstanceIds: instanceIds,
     })
 	_, err := req.Send(context.TODO())
-    // printAWSError(err)      // TODO: graceful error handling
+    return err
 }
-func (mdl *EC2Model) TerminateEC2Instances(instanceIds []string) []ec2.InstanceStateChange {
+func (mdl *EC2Model) TerminateEC2Instances(instanceIds []string) ([]ec2.InstanceStateChange, error){
 
 	req := mdl.model.TerminateInstancesRequest(&ec2.TerminateInstancesInput{
         InstanceIds: instanceIds,
     })
 	resp, err := req.Send(context.TODO())
-    // printAWSError(err)      // TODO: graceful error handling
-    return resp.TerminatingInstances
+    if err != nil {
+        return nil, err
+    }
+    return resp.TerminatingInstances, err
 }
-func (mdl *EC2Model) GetEC2Instances() []ec2.Instance {
+func (mdl *EC2Model) GetEC2Instances() ([]ec2.Instance, error) {
 
     req := mdl.model.DescribeInstancesRequest(&ec2.DescribeInstancesInput{})
     paginator := ec2.NewDescribeInstancesPaginator(req)
@@ -78,22 +83,24 @@ func (mdl *EC2Model) GetEC2Instances() []ec2.Instance {
             instances = append(instances, reservation.Instances...)
         }
     }
-
-    // printAWSError(paginator.Err())      // TODO: graceful error handling
-	return instances
+    if paginator.Err() != nil {
+        return nil, paginator.Err()
+    }
+	return instances, paginator.Err()
 }
 
 // Lists all instance types offered in the default region
-func (mdl *EC2Model) ListOfferings() []ec2.InstanceTypeOffering { // TODO: region, filters
+func (mdl *EC2Model) ListOfferings() ([]ec2.InstanceTypeOffering, error) { // TODO: region, filters
 	req := mdl.model.DescribeInstanceTypeOfferingsRequest(&ec2.DescribeInstanceTypeOfferingsInput{})
 	resp, err := req.Send(context.TODO())
-    // printAWSError(err)      // TODO: graceful error handling
-	return resp.InstanceTypeOfferings
+    if err != nil {
+        return nil, err
+    }
+	return resp.InstanceTypeOfferings, err
 }
 
 // Lists AMIs offered
-func (mdl *EC2Model) ListAMIs(filterMap map[string]string) []ec2.Image {
-	// TODO: assert length
+func (mdl *EC2Model) ListAMIs(filterMap map[string]string) ([]ec2.Image, error) {
 	var filters []ec2.Filter
 	for filterName, filterValue := range filterMap {
 		// if filterValue != ""
@@ -102,22 +109,24 @@ func (mdl *EC2Model) ListAMIs(filterMap map[string]string) []ec2.Image {
 	}
 	req := mdl.model.DescribeImagesRequest(&ec2.DescribeImagesInput{Filters: filters})
 	resp, err := req.Send(context.TODO())
-    // printAWSError(err)      // TODO: graceful error handling
 
-	return resp.Images
+    if err != nil {
+        return nil, err
+    }
+	return resp.Images, err
 }
 
 // Changes instance type (or resize) to instType. For the restrictions on resizing an instance, see https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-resize.html
-func (mdl *EC2Model) ChangeInstanceType(instId, instType string) {
+func (mdl *EC2Model) ChangeInstanceType(instId, instType string) error {
     req := mdl.model.ModifyInstanceAttributeRequest(&ec2.ModifyInstanceAttributeInput{
         InstanceId: aws.String(instId),
         InstanceType: &ec2.AttributeValue{Value: aws.String(instType)},
     })
 	_, err := req.Send(context.TODO())
-    // printAWSError(err)      // TODO: graceful error handling
     // return resp.ModifyInstanceAttributeOutput         // an empty struct is returned
+    return err
 }
-func (mdl *EC2Model) ListVolumes() []ec2.Volume {
+func (mdl *EC2Model) ListVolumes() ([]ec2.Volume, error) {
 	var (
         volumes []ec2.Volume
     )
@@ -127,8 +136,10 @@ func (mdl *EC2Model) ListVolumes() []ec2.Volume {
         volumes = append(volumes, paginator.CurrentPage().Volumes...)
     }
 
-    // printAWSError(paginator.Err())      // TODO: graceful error handling
-	return volumes
+    if paginator.Err() != nil {
+        return nil, paginator.Err()
+    }
+	return volumes, paginator.Err()
 }
 // TODO: I don't understand yet why this is better than a simple print
 func  printAWSError(err error) error {
@@ -166,7 +177,7 @@ func watcher1(client *ec2.Client, ch chan<- common.Action, describeAll bool) {
 		IncludeAllInstances: &describeAll,
 	})
 	resp, err := req.Send(context.TODO())
-    // printAWSError(err)      // TODO: graceful error handling
+    printAWSError(err)
 	sendMe := common.Action{Type: common.ACTION_INSTANCE_STATUS_UPDATE, Data: common.InstanceStatusesUpdate(resp.InstanceStatuses)} // TODO: paginator
 	ch <- sendMe
 }

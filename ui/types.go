@@ -11,12 +11,53 @@ import (
 )
 
 type mainUI struct {
-	// View    []viewComponent
 	MainApp   *tview.Application
 	RootPage  *ePages
 	StatusBar *StatusBar
 }
 
+// Shows a modal box with msg and switches back to previous page. This is useful for one-off usage (no nested boxes)
+func (u mainUI) showConfirmationBox(msg string, doneFunc func()) {
+	modal := tview.NewModal().
+		SetText(msg).
+		AddButtons([]string{"Ok", "Cancel"}).
+		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+			if buttonLabel == "Ok" && doneFunc != nil {
+                defer func(){ go doneFunc() }()     // TODO: it's a mess with nested dialogues
+			}
+            u.RootPage.ESwitchToPreviousPage()
+	        u.RootPage.ShowPage(u.RootPage.GetPreviousPageName()) // +1
+		})
+        u.RootPage.EAddAndSwitchToPage("modal", modal, false)      // resize=false
+        u.RootPage.ShowPage(u.RootPage.GetPreviousPageName()) // +1
+
+}
+
+// Shows a generic modal box (rather than a confirmation-only box) centered at screen
+// Props to skanehira from the docker tui "docui" for this! code is at github.com/skanehira/docui
+func (u mainUI) showGenericModal(p tview.Primitive, width, height int) {
+	var centeredModal *eGrid
+	// unfortunately you can't access grid's minumum width or height. what to do ?
+	// if g, ok := p.(*eGrid); ok {    // TODO: grid inside centered grid correctly; tview.Grid
+	//     centeredModal = g
+	// log.Println("OUR GRID")
+	// // trying a flex instead
+	// centeredModal := NewEFlex(u.RootPage).SetFullScreen(false).AddItem(
+	//     tview.NewFlex().SetDirection(tview.FlexColumn).AddItem(p, width, 0, true),
+	//     height, 0, true)
+	// centeredModal.SetColumns(0, width, 0).
+	//                 SetRows(0, height, 0)
+	// } else {
+	centeredModal = NewEgrid(u.RootPage)
+	centeredModal.SetColumns(0, width, 0).
+		SetRows(0, height, 0).
+		AddItem(p, 1, 1, 1, 1, 0, 0, true) // focus=true
+		// }
+	// currPageName := u.RootPage.GetCurrentPageName()
+	u.RootPage.EAddAndSwitchToPage("centered modal", centeredModal, true) // resize=true
+	u.RootPage.ShowPage(u.RootPage.GetPreviousPageName())                                     // redraw on top (bottom ?) of the box
+
+}
 // TODO: generalize services as a structure
 // type service struct {
 // 	*mainUI
@@ -26,7 +67,7 @@ type mainUI struct {
 
 // A common type used to hold keyboard keys to functions
 type inputCapturer struct {
-	// setKeyToFunc(p tview.Primitive, keyToFunc map[tcell.Key]func()){
+    // setKeyToFunc(p tview.Primitive, keyToFunc map[tcell.Key]func()){
 	keyToFunc map[tcell.Key]func()
 }
 
@@ -140,7 +181,10 @@ func (p *ePages) DisplayHelpMessage(msg string) *ePages {
 }
 
 func (p *ePages) GetPreviousPageName() string {
-	return p.pageStack[len(p.pageStack)-1]
+    if len(p.pageStack) > 0 {
+        return p.pageStack[len(p.pageStack)-1]
+    }
+    return ""       // Invalid page name
 }
 
 func (p *ePages) GetCurrentPageName() string {
@@ -471,8 +515,9 @@ func NewStatusBar() *StatusBar {
     // TODO: this is a naiive way of clearing the text bar on regular intervals; no syncronization or context is used
 	bar.SetChangedFunc(func() {
 		time.Sleep(time.Duration(bar.durationInSeconds) * time.Second)
-		bar.Clear()
+		bar.Clear()     // Clear() does not trigger a changed event
 	})
+    bar.SetScrollable(false)        // Helps trimming the internal buffer to only the viewable area
 	return &bar
 }
 
