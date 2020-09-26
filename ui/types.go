@@ -23,13 +23,13 @@ func (u mainUI) showConfirmationBox(msg string, doneFunc func()) {
 		AddButtons([]string{"Ok", "Cancel"}).
 		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 			if buttonLabel == "Ok" && doneFunc != nil {
-                defer func(){ go doneFunc() }()     // TODO: it's a mess with nested dialogues
+				defer func() { go doneFunc() }() // TODO: it's a mess with nested dialogues
 			}
-            u.RootPage.ESwitchToPreviousPage()
-	        u.RootPage.ShowPage(u.RootPage.GetPreviousPageName()) // +1
+			u.RootPage.ESwitchToPreviousPage()
+			u.RootPage.ShowPage(u.RootPage.GetPreviousPageName()) // +1
 		})
-        u.RootPage.EAddAndSwitchToPage("modal", modal, false)      // resize=false
-        u.RootPage.ShowPage(u.RootPage.GetPreviousPageName()) // +1
+	u.RootPage.EAddAndSwitchToPage("modal", modal, false) // resize=false
+	u.RootPage.ShowPage(u.RootPage.GetPreviousPageName()) // +1
 
 }
 
@@ -55,19 +55,19 @@ func (u mainUI) showGenericModal(p tview.Primitive, width, height int) {
 		// }
 	// currPageName := u.RootPage.GetCurrentPageName()
 	u.RootPage.EAddAndSwitchToPage("centered modal", centeredModal, true) // resize=true
-	u.RootPage.ShowPage(u.RootPage.GetPreviousPageName())                                     // redraw on top (bottom ?) of the box
+	u.RootPage.ShowPage(u.RootPage.GetPreviousPageName())                 // redraw on top (bottom ?) of the box
 
 }
+
 // TODO: generalize services as a structure
 // type service struct {
 // 	*mainUI
 // 	*aws.Client
 // }
 
-
 // A common type used to hold keyboard keys to functions
 type inputCapturer struct {
-    // setKeyToFunc(p tview.Primitive, keyToFunc map[tcell.Key]func()){
+	// setKeyToFunc(p tview.Primitive, keyToFunc map[tcell.Key]func()){
 	keyToFunc map[tcell.Key]func()
 }
 
@@ -181,10 +181,10 @@ func (p *ePages) DisplayHelpMessage(msg string) *ePages {
 }
 
 func (p *ePages) GetPreviousPageName() string {
-    if len(p.pageStack) > 0 {
-        return p.pageStack[len(p.pageStack)-1]
-    }
-    return ""       // Invalid page name
+	if len(p.pageStack) > 0 {
+		return p.pageStack[len(p.pageStack)-1]
+	}
+	return "" // Invalid page name
 }
 
 func (p *ePages) GetCurrentPageName() string {
@@ -294,6 +294,7 @@ func NewEgrid(parentPages *ePages) *eGrid {
 	g.setKeyToFunc()
 	return &g
 }
+
 // Wrapper function around tview.Grid.AddItem
 func (g *eGrid) EAddItem(p tview.Primitive, row, column, rowSpan, colSpan, minGridHeight, minGridWidth int, focus bool) *eGrid {
 
@@ -512,12 +513,12 @@ func NewStatusBar() *StatusBar {
 		TextView:          tview.NewTextView(),
 		durationInSeconds: 3, // TODO: parameter
 	}
-    // TODO: this is a naiive way of clearing the text bar on regular intervals; no syncronization or context is used
+	// TODO: this is a naiive way of clearing the text bar on regular intervals; no syncronization or context is used
 	bar.SetChangedFunc(func() {
 		time.Sleep(time.Duration(bar.durationInSeconds) * time.Second)
-		bar.Clear()     // Clear() does not trigger a changed event
+		bar.Clear() // Clear() does not trigger a changed event
 	})
-    bar.SetScrollable(false)        // Helps trimming the internal buffer to only the viewable area
+	bar.SetScrollable(false) // Helps trimming the internal buffer to only the viewable area
 	return &bar
 }
 
@@ -554,6 +555,5 @@ func stringFromAWSVar(awsVar interface{}) string {
 			t = ""
 		}
 	}
-    return t        // TODO: return error on failure
+	return t // TODO: return error on failure
 }
-

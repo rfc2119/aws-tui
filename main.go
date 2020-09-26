@@ -6,14 +6,13 @@ import (
 	"rfc2119/aws-tui/common"
 	"rfc2119/aws-tui/ui"
 
-	"github.com/rivo/tview"
-	"github.com/aws/aws-sdk-go-v2/aws/external"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/external"
+	"github.com/rivo/tview"
 )
 
 const (
-    MAIN_HELP_MSG =
-`Welcome to the unofficial AWS Terminal Interface. This is a very much work-in-progress and I appreciate your feedback, issues, code improvements, ... etc. Please submit them at https://github.com/rfc2119/aws-tui
+	MAIN_HELP_MSG = `Welcome to the unofficial AWS Terminal Interface. This is a very much work-in-progress and I appreciate your feedback, issues, code improvements, ... etc. Please submit them at https://github.com/rfc2119/aws-tui
 
 Common keys found across all windows:
 
@@ -24,7 +23,7 @@ Common keys found across all windows:
 
 Use Ctrl-C to exit the application
 `
-    version = "0.1"     // TODO: git commit's SHA added to the built binary
+	version = "0.1" // TODO: git commit's SHA added to the built binary
 
 )
 
@@ -46,28 +45,28 @@ func main() {
 
 	// services
 	ec2svc := ui.NewEC2Service(config, app, pages, statusBar)
-    ec2svc.InitView()       // TODO: call only when user selects the service
-    iamsvc := ui.NewIAMService(config, app, pages, statusBar)
+	ec2svc.InitView() // TODO: call only when user selects the service
+	iamsvc := ui.NewIAMService(config, app, pages, statusBar)
 
 	// ui elements
 	mainContainer := tview.NewFlex() // a flex container for the status bar and application pages/window
-    frontPage := ui.NewEFlex(pages)    // the front page which holds the info and tree view
-    info := tview.NewTextView()
+	frontPage := ui.NewEFlex(pages)  // the front page which holds the info and tree view
+	info := tview.NewTextView()
 	tree := tview.NewTreeView()
 
 	// filling the tree with initial values
 	rootNode := tview.NewTreeNode("Services")
 	for service, name := range common.ServiceNames {
-        if common.AvailableServices[service] {
-            nodeLevel1 := tview.NewTreeNode(name)
-            for _, subItemName := range common.ServiceChildrenNames[service] {
-                nodeLevel2 := tview.NewTreeNode(subItemName)
-                nodeLevel1.AddChild(nodeLevel2)
-                // _tmpChild.SetExpanded(false)
-            }
-            nodeLevel1.Collapse()
-            rootNode.AddChild(nodeLevel1)
-        }
+		if common.AvailableServices[service] {
+			nodeLevel1 := tview.NewTreeNode(name)
+			for _, subItemName := range common.ServiceChildrenNames[service] {
+				nodeLevel2 := tview.NewTreeNode(subItemName)
+				nodeLevel1.AddChild(nodeLevel2)
+				// _tmpChild.SetExpanded(false)
+			}
+			nodeLevel1.Collapse()
+			rootNode.AddChild(nodeLevel1)
+		}
 	}
 
 	tree.SetSelectedFunc(func(node *tview.TreeNode) {
@@ -80,10 +79,10 @@ func main() {
 		}
 	})
 
-    // filling the info box with initial values
-    currentIAMUser := iamsvc.Model.GetCurrentUserInfo()
-    fmt.Fprintf(info,
-    `
+	// filling the info box with initial values
+	currentIAMUser := iamsvc.Model.GetCurrentUserInfo()
+	fmt.Fprintf(info,
+		`
     IAM User name: %7s
     IAM User arn:  %20s
     Region:        %7s
@@ -97,17 +96,17 @@ func main() {
 	tree.SetRoot(rootNode)
 	tree.SetCurrentNode(rootNode)
 
-    frontPage.HelpMessage = MAIN_HELP_MSG
+	frontPage.HelpMessage = MAIN_HELP_MSG
 	frontPage.SetDirection(tview.FlexColumn)
-    frontPage.AddItem(tree, 0, 3, true)
-    frontPage.AddItem(info, 0, 2, false)
+	frontPage.AddItem(tree, 0, 3, true)
+	frontPage.AddItem(info, 0, 2, false)
 
 	mainContainer.SetDirection(tview.FlexRow).SetFullScreen(true)
 	mainContainer.AddItem(pages, 0, 107, true)    //AddItem(item Primitive, fixedSize, proportion int, focus bool)
 	mainContainer.AddItem(statusBar, 0, 1, false) // 107:1 seems fair ?
 
-	pages.EAddPage("Services", frontPage, true, true)  // EAddPage(name string, item tview.Primitive, resize, visible bool)
-    statusBar.SetText("Welcome to the terminal interface for AWS. Type '?' to get help")
+	pages.EAddPage("Services", frontPage, true, true) // EAddPage(name string, item tview.Primitive, resize, visible bool)
+	statusBar.SetText("Welcome to the terminal interface for AWS. Type '?' to get help")
 	if err := app.SetRoot(mainContainer, true).SetFocus(mainContainer).Run(); err != nil {
 		panic(err)
 	}
