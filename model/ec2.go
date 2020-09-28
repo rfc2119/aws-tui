@@ -207,3 +207,13 @@ func watcher1(client *ec2.Client, ch chan<- common.Action, describeAll bool) {
 	sendMe := common.Action{Type: common.ACTION_INSTANCE_STATUS_UPDATE, Data: common.InstanceStatusesUpdate(resp.InstanceStatuses)} // TODO: paginator
 	ch <- sendMe
 }
+// watcher2 watches the status of all EBS Volumes.
+// func watcher2(client *ec2.Client, ch chan<- common.Action, describeAll bool) {
+// 	req := client.DescribeInstanceStatusRequest(&ec2.DescribeInstanceStatusInput{
+// 		IncludeAllInstances: &describeAll,
+// 	})
+// 	resp, err := req.Send(context.TODO())
+//     printAWSError(err)
+// 	sendMe := common.Action{Type: common.ACTION_INSTANCE_STATUS_UPDATE, Data: common.InstanceStatusesUpdate(resp.InstanceStatuses)} // TODO: paginator
+// 	ch <- sendMe
+// }

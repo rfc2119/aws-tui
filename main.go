@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	MAIN_HELP_MSG = `Welcome to the unofficial AWS Terminal Interface. This is a very much work-in-progress and I appreciate your feedback, issues, code improvements, ... etc. Please submit them at https://github.com/rfc2119/aws-tui
+	MAIN_HELP_MSG = `
+Welcome to the unofficial AWS Terminal Interface. This is a very much work-in-progress and I appreciate your feedback, issues, code improvements, ... etc. Please submit them at https://github.com/rfc2119/aws-tui
 
 Common keys found across all windows:
 
@@ -21,7 +22,7 @@ Common keys found across all windows:
 	q               Move back one page (will exit this help message)
     Space           Select Option in a radio box/tree view (except in a confirmation box)
 
-Use Ctrl-C to exit the application
+There's likely a help page for every window, so please use '?'. Use Ctrl-C to exit the application.
 `
 	version = "0.1" // TODO: git commit's SHA added to the built binary
 

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+    // "log"
 	"reflect"
 	"time"
 
@@ -17,25 +18,36 @@ type mainUI struct {
 }
 
 // Shows a modal box with msg and switches back to previous page. This is useful for one-off usage (no nested boxes)
-func (u mainUI) showConfirmationBox(msg string, doneFunc func()) {
+func (u mainUI) showConfirmationBox(msg string, rememberLastPage bool, doneFunc func()) {
 	modal := tview.NewModal().
 		SetText(msg).
 		AddButtons([]string{"Ok", "Cancel"}).
 		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 			if buttonLabel == "Ok" && doneFunc != nil {
-				defer func() { go doneFunc() }() // TODO: it's a mess with nested dialogues
+				go func(){
+                    doneFunc()  // TODO: it's a mess with nested dialogues
+                    u.MainApp.Draw()    // The key to get this done right
+                }()
 			}
 			u.RootPage.ESwitchToPreviousPage()
 			u.RootPage.ShowPage(u.RootPage.GetPreviousPageName()) // +1
 		})
-	u.RootPage.EAddAndSwitchToPage("modal", modal, false) // resize=false
-	u.RootPage.ShowPage(u.RootPage.GetPreviousPageName()) // +1
+    // TODO: remove this and put a fixed page name. see if anything crashes
+    pageName := fmt.Sprintf("%p", &modal)
+    if rememberLastPage {
+        u.RootPage.EAddAndSwitchToPage(pageName, modal, false) // resize=false
+        u.RootPage.ShowPage(u.RootPage.GetCurrentPageName()) // +1
+    } else {
+        currPageName := u.RootPage.GetCurrentPageName()
+        u.RootPage.AddAndSwitchToPage(pageName, modal, false) // resize=false
+        u.RootPage.ShowPage(currPageName) // +1
+    }
 
 }
 
 // Shows a generic modal box (rather than a confirmation-only box) centered at screen
 // Props to skanehira from the docker tui "docui" for this! code is at github.com/skanehira/docui
-func (u mainUI) showGenericModal(p tview.Primitive, width, height int) {
+func (u mainUI) showGenericModal(p tview.Primitive, width, height int, rememberLastPage bool) {
 	var centeredModal *eGrid
 	// unfortunately you can't access grid's minumum width or height. what to do ?
 	// if g, ok := p.(*eGrid); ok {    // TODO: grid inside centered grid correctly; tview.Grid
@@ -53,9 +65,18 @@ func (u mainUI) showGenericModal(p tview.Primitive, width, height int) {
 		SetRows(0, height, 0).
 		AddItem(p, 1, 1, 1, 1, 0, 0, true) // focus=true
 		// }
-	// currPageName := u.RootPage.GetCurrentPageName()
-	u.RootPage.EAddAndSwitchToPage("centered modal", centeredModal, true) // resize=true
-	u.RootPage.ShowPage(u.RootPage.GetPreviousPageName())                 // redraw on top (bottom ?) of the box
+    if g, ok := p.(*eGrid); ok { centeredModal.HelpMessage = g.HelpMessage }    // TODO: eFlex
+    // TODO: remove this and put a fixed page name. see if anything crashes
+    pageName := fmt.Sprintf("%p", &centeredModal)
+    if rememberLastPage {
+        u.RootPage.EAddAndSwitchToPage(pageName, centeredModal, true) // resize=true
+        u.RootPage.ShowPage(u.RootPage.GetPreviousPageName())                 // redraw on top (bottom ?) of the box
+    } else {
+        currPageName := u.RootPage.GetCurrentPageName()
+        u.RootPage.AddAndSwitchToPage(pageName, centeredModal, true) // resize=true
+        u.RootPage.ShowPage(currPageName)       // redraw on top (bottom ?) of the box
+    }
+
 
 }
 
@@ -148,8 +169,10 @@ func (p *ePages) EAddPage(name string, item tview.Primitive, resize, visible boo
 
 // Use this to go forward one page. Do not use it if you intend not to go back (confirmation boxes for example). Instead, use the normal tview.SwitchToPage or tview.AddAndSwitchToPage
 func (p *ePages) ESwitchToPage(name string) *ePages {
-	currentPageName, _ := p.GetFrontPage()
-	p.pageStack = append(p.pageStack, currentPageName)
+	currentPageName := p.GetCurrentPageName()
+    if p.GetPreviousPageName() != currentPageName {
+        p.pageStack = append(p.pageStack, currentPageName)
+    }
 	p.SwitchToPage(name)
 	return p
 
@@ -174,7 +197,6 @@ func (p *ePages) ESwitchToPreviousPage() *ePages {
 // Displays the help message given. Note that there should be no nested help messages
 func (p *ePages) DisplayHelpMessage(msg string) *ePages {
 	helpPage := tview.NewTextView()
-	// helpPage.SetBackgroundColor(tcell.ColorBlue)
 	helpPage.SetTitle("Help").SetTitleAlign(tview.AlignCenter).SetBorder(true)
 	helpPage.SetText(msg)
 	return p.EAddAndSwitchToPage("help", helpPage, true) // "help" page gets overriden each time; resizable=true
@@ -503,22 +525,25 @@ func (r *RadioButtons) setKeyToFunc() { // TODO: see repeated method on other ty
 // ====================
 // A non-focusable status bar
 type StatusBar struct {
-	*tview.TextView
-	durationInSeconds int // duration after which the status bar is  cleared
+	tview.TextView
+    // app *tview.Application // Needed to properly clear text. Can be omitted
+	durationInSeconds int // Duration after which the status bar is  cleared
 }
 
 func NewStatusBar() *StatusBar {
 
 	bar := StatusBar{
-		TextView:          tview.NewTextView(),
-		durationInSeconds: 3, // TODO: parameter
+		TextView:          *tview.NewTextView(),
+        // app: app,
+		durationInSeconds: 3, // TODO: Parameter
 	}
 	// TODO: this is a naiive way of clearing the text bar on regular intervals; no syncronization or context is used
 	bar.SetChangedFunc(func() {
+        // go bar.app.Draw()          // hmmmmmm
 		time.Sleep(time.Duration(bar.durationInSeconds) * time.Second)
 		bar.Clear() // Clear() does not trigger a changed event
 	})
-	bar.SetScrollable(false) // Helps trimming the internal buffer to only the viewable area
+	// bar.SetScrollable(false) // Helps trimming the internal buffer to only the viewable area
 	return &bar
 }
 
