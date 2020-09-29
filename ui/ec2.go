@@ -6,6 +6,7 @@ import (
 	"rfc2119/aws-tui/common"
 	"rfc2119/aws-tui/model"
 	"strings"
+    "strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -60,7 +61,15 @@ If your volume state becomes *detaching*, it is likely that you need the "Force 
 # Device names
 On linux Devices, names /dev/sd{f-p} are valid "mount points". The kernel may rename these internally to something like /dev/xvd{f-p}. For HVM instances, /dev/sda1 or /dev/xvda is reserved for root devices.See https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html for a complete list of valid names and considerations
 
-# Type, size and IOPS (if applicable)
+# Type, size and IOPS
+Available types are abbreviated as the following. Not all volumes can have its type changed.Setting IOPS is only available for io{1,2} types
+
+    General Purpose SSD (gp2)
+    Provisioned IOPS SSD    (io2 and io1)
+    Throughput Optimized HDD (st1)
+    Cold HDD (sc1)
+
+Please see https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-volume-types.html#ebs-volume-characteristics for a comprehensive description
 `
 )
 
@@ -90,6 +99,8 @@ var (
 	}) // Component in "Edit volumes"
 	tableEditVolume        = NewEtable()
 	EBSVolumesStateMachine = common.NewEBSVolumeStateMachine()
+
+
 )
 
 type ec2Service struct {
@@ -159,10 +170,13 @@ func (ec2svc *ec2Service) InitView() {
 	volumesFlex.SetDirection(tview.FlexColumn)
 	volumesFlex.EAddItem(volumesTable, 0, 1, true)
 
-	inputFieldVolumeIops.SetLabel("IOPS")
-	inputFieldVolumeSize.SetLabel("Size (GiB)")
+	inputFieldVolumeIops.SetLabel("IOPS").SetFieldWidth(5)
+	inputFieldVolumeSize.SetLabel("Size (GiB)").SetFieldWidth(5)
 	dropDownVolumeType.SetLabel("Type")
-	dropDownVolumeType.SetOptions([]string{"Magnetic (standard)", "General Purpose SSD (gp2)", "Provisioned IOPS SSD (io1)", "Provisioned IOPS SSD (io2)"}, nil)
+	// dropDownVolumeType.SetOptions([]string{"Magnetic (standard)", "General Purpose SSD (gp2)", "Provisioned IOPS SSD (io1)", "Provisioned IOPS SSD (io2)"}, nil)
+	dropDownVolumeType.SetOptions(
+        []string{"standard", "io1", "io2", "gp2", "sc1", "st1"},
+        nil)
 	gridEditVolume.SetBorders(true).SetTitle("Test") // Not working :(
 
 	tableEditVolume.SetBorders(false)
@@ -171,18 +185,20 @@ func (ec2svc *ec2Service) InitView() {
 	tableEditVolume.SetFixed(0, 2)
 
 	gridEditVolume.HelpMessage = HELP_EBS_EDIT_VOL
-	gridEditVolume.SetRows(3, 3, 0)
+	gridEditVolume.SetRows(2, 2, 2, 0)
 	gridEditVolume.SetColumns(10, 0, 20)
 	gridEditVolume.EAddItem(dropDownVolumeType, 0, 0, 1, 2, 0, 0, true) // row, col, rowSpan, colSpan, minGridHeight, minGridWidth, focus
 	gridEditVolume.EAddItem(inputFieldVolumeSize, 1, 0, 1, 2, 0, 0, false)
-	gridEditVolume.EAddItem(radioButtonVolumeStatus, 0, 2, 2, 1, 0, 0, false) // TODO: iops
-	gridEditVolume.EAddItem(tableEditVolume, 2, 0, 1, 3, 20, 40, false)
+	gridEditVolume.EAddItem(inputFieldVolumeIops, 2, 0, 1, 2, 0, 0, false)
+	gridEditVolume.EAddItem(radioButtonVolumeStatus, 0, 2, 3, 1, 0, 0, false)
+	gridEditVolume.EAddItem(tableEditVolume, 3, 0, 1, 3, 20, 40, false)
 	ec2svc.mainUI.enableShiftingFocus(gridEditVolume.layoutContainer)
 
 	ec2svc.RootPage.EAddPage("Instances", instancesFlex, true, false) // TODO: page names and such; resize=true, visible=false
 	ec2svc.RootPage.EAddPage("Volumes", volumesFlex, true, false)     // TODO: page names and such; resize=true, visible=false
 
 	ec2svc.WatchChanges()
+    ec2svc.setDropDownsCallbacks()
 
 }
 
@@ -418,6 +434,64 @@ func (ec2svc *ec2Service) setCallbacks() {
 		}
 		configureRadioButton(radioButtonVolumeStatus, EBSVolumesStateMachine)
 	})
+    inputFieldVolumeIops.SetDoneFunc(func(key tcell.Key){
+        if key == tcell.KeyEnter {
+        row, _ := volumesTable.GetSelection()
+        oldIops := volumesTable.GetCell(row, COL_EBS_IOPS).Text
+        newIops := inputFieldVolumeIops.GetText()
+        if oldIops != newIops {     // TODO: should new IOPS be > old IOPS ?
+            var (
+                iops int64
+                err error
+            )
+            msg := fmt.Sprintf("Change volume IOPS from %s to %s ?", oldIops, newIops)
+            volId := volumesTable.GetCell(row, COL_EBS_ID).Text
+            if iops, err = strconv.ParseInt(newIops, 10, 64); err != nil {
+                log.Println("numerical conversion error")
+                return
+            }
+            ec2svc.showConfirmationBox(msg, true, func(){
+                if _, err := ec2svc.Model.ModifyVolume(iops, -1, "", volId); err != nil { // alert
+                    ec2svc.showConfirmationBox(err.Error(), true, nil)
+                    return
+                }
+                ec2svc.StatusBar.SetText("changing volume IOPS to " + newIops)
+            })
+        }
+    }
+    })
+}
+
+// SetOptions(..., nil) gets called after initializing callbacks for UI elements
+func (ec2svc *ec2Service) setDropDownsCallbacks(){
+
+    dropDownVolumeType.SetSelectedFunc(func(newType string, index int){
+        row, _ := volumesTable.GetSelection()
+        oldType := volumesTable.GetCell(row, COL_EBS_TYPE).Text
+        ec2svc.StatusBar.SetText(oldType)
+        if oldType != newType {
+            var (
+                iops int64 = -1
+                err error
+            )
+            msg := fmt.Sprintf("Change volume type from %s to %s ?", oldType, newType)
+            volId := volumesTable.GetCell(row, COL_EBS_ID).Text
+            if newType == "io1" || newType == "io2" {
+                msg = msg + "\nNote: Please specify the required IOPS in the IOPS field "
+                if iops, err = strconv.ParseInt(inputFieldVolumeIops.GetText(), 10, 64); err != nil {
+                    log.Println("numerical conversion error")
+                }
+            }
+            ec2svc.showConfirmationBox(msg, true, func(){
+                if _, err := ec2svc.Model.ModifyVolume(iops, -1, newType, volId); err != nil { // alert
+                    ec2svc.showConfirmationBox(err.Error(), true, nil)
+                    return
+                }
+                ec2svc.StatusBar.SetText("changing volume type to " + newType)
+            })
+        }
+    })
+	instanceOfferingsDropdown.SetSelectedFunc(nil)      // TODO
 }
 
 // TODO: could this be a generic filter box ?
@@ -611,7 +685,7 @@ func configureRadioButton(rButton *RadioButtons, sm *common.EStateMachine) {
 func fillTableEditVolume(ec2svc *ec2Service) {
 	row, _ := volumesTable.GetSelection()
 	attachments := ec2svc.volumes[row-1].Attachments
-	if len(attachments) == 0 { // clear table
+	if len(attachments) == 0 { // Clear table
 		tableEditVolume.Clear()
 		drawFirstRowTable(tableEditVolume)
 		return

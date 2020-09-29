@@ -167,6 +167,20 @@ func (mdl *EC2Model) DetachVolume(volId, instId, dev string, force bool) (ec2.De
     }
     return *resp.DetachVolumeOutput, nil
 }
+func (mdl *EC2Model) ModifyVolume(iops, size int64, volType, volId string) (ec2.ModifyVolumeOutput, error) {
+    input := &ec2.ModifyVolumeInput{}
+    if iops != -1 { input.Iops = aws.Int64(iops) }
+    if size != -1 { input.Size = aws.Int64(size) }
+    if volType != "" { input.VolumeType = ec2.VolumeType(volType) }
+    input.VolumeId = aws.String(volId)
+
+    req := mdl.model.ModifyVolumeRequest(input)
+	resp, err := req.Send(context.TODO())
+    if err != nil {
+        return ec2.ModifyVolumeOutput{}, err
+    }
+    return *resp.ModifyVolumeOutput, nil
+}
 // TODO: I don't understand yet why this is better than a simple print
 func  printAWSError(err error) error {
     if err != nil {
