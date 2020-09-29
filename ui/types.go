@@ -11,10 +11,53 @@ import (
 	"github.com/rivo/tview"
 )
 
+// A common type used to hold keyboard keys to functions
+type inputCapturer struct {
+	// setKeyToFunc(p tview.Primitive, keyToFunc map[tcell.Key]func()){
+	keyToFunc map[tcell.Key]func()
+}
+
+func (i *inputCapturer) UpdateKeyToFunc(keyToF map[tcell.Key]func()) {
+	for k, v := range keyToF {
+		i.keyToFunc[k] = v
+	}
+}
+
+type layoutContainer struct {
+	*inputCapturer
+	Members              []tview.Primitive // equivalent to the unexported member 'items' in tview.Grid
+	CurrentMemberInFocus int               // index of the current member that has focus
+}
+
 type mainUI struct {
 	MainApp   *tview.Application
 	RootPage  *ePages
 	StatusBar *StatusBar
+}
+
+// If only we can shift focus to grid/flex members without a tview.Application...
+func (u mainUI) enableShiftingFocus(l *layoutContainer){
+
+	l.inputCapturer.UpdateKeyToFunc(map[tcell.Key]func(){
+		tcell.KeyTab: func() {
+			if len(l.Members) > 0 {
+				l.CurrentMemberInFocus++
+				if l.CurrentMemberInFocus >= len(l.Members) { //  l.CurrentMemberInFocus %= len(l.Members)
+					l.CurrentMemberInFocus = 0
+				}
+				u.MainApp.SetFocus(l.Members[l.CurrentMemberInFocus])
+			}
+		},
+		tcell.KeyBacktab: func() {
+			if len(l.Members) > 0 {
+				l.CurrentMemberInFocus--
+				if l.CurrentMemberInFocus < 0 { //  l.CurrentMemberInFocus %= len(l.Members)
+					l.CurrentMemberInFocus = len(l.Members) - 1
+				}
+				u.MainApp.SetFocus(l.Members[l.CurrentMemberInFocus])
+			}
+		},
+	})
 }
 
 // Shows a modal box with msg and switches back to previous page. This is useful for one-off usage (no nested boxes)
@@ -86,17 +129,6 @@ func (u mainUI) showGenericModal(p tview.Primitive, width, height int, rememberL
 // 	*aws.Client
 // }
 
-// A common type used to hold keyboard keys to functions
-type inputCapturer struct {
-	// setKeyToFunc(p tview.Primitive, keyToFunc map[tcell.Key]func()){
-	keyToFunc map[tcell.Key]func()
-}
-
-func (i *inputCapturer) UpdateKeyToFunc(keyToF map[tcell.Key]func()) {
-	for k, v := range keyToF {
-		i.keyToFunc[k] = v
-	}
-}
 
 // TODO: generalize
 // uses SetInputCapture on primitive
@@ -219,9 +251,7 @@ func (p *ePages) GetCurrentPageName() string {
 // eFlex definition and methods
 type eFlex struct {
 	*tview.Flex
-	*inputCapturer
-	Members              []tview.Primitive // equivalent to the unexported member 'items' in tview.Grid
-	CurrentMemberInFocus int               // index of the current member that has focus
+    *layoutContainer
 	HelpMessage          string
 	parent               *ePages // parent is used to display help message and navigate back to previous page (TODO: maybe the flex can do this itself ?)
 }
@@ -229,11 +259,13 @@ type eFlex struct {
 func NewEFlex(parentPages *ePages) *eFlex {
 	f := eFlex{
 		Flex:                 tview.NewFlex(),
-		Members:              []tview.Primitive{},
-		CurrentMemberInFocus: 0,
+        layoutContainer: &layoutContainer{
+            Members:              []tview.Primitive{},
+            CurrentMemberInFocus: 0,
+            inputCapturer:        &inputCapturer{keyToFunc: make(map[tcell.Key]func())},
+        },
 		HelpMessage:          "NO HELP MESSAGE (maybe submit a pull request ?)",
 		parent:               parentPages,
-		inputCapturer:        &inputCapturer{keyToFunc: make(map[tcell.Key]func())},
 	}
 	f.inputCapturer.UpdateKeyToFunc(map[tcell.Key]func(){
 		tcell.Key('?'): func() { f.DisplayHelp() },
@@ -250,29 +282,6 @@ func (f *eFlex) DisplayHelp() {
 	f.parent.DisplayHelpMessage(f.HelpMessage)
 }
 
-// If only we can shift focus to grid/flex members without a tview.Application...
-func (f *eFlex) SetShiftFocusFunc(app *tview.Application) {
-	f.UpdateKeyToFunc(map[tcell.Key]func(){
-		tcell.KeyTab: func() {
-			if len(f.Members) > 0 {
-				f.CurrentMemberInFocus++
-				if f.CurrentMemberInFocus == len(f.Members) { //  f.CurrentMemberInFocus %= len(f.Members)
-					f.CurrentMemberInFocus = 0
-				}
-				app.SetFocus(f.Members[f.CurrentMemberInFocus])
-			}
-		},
-		tcell.KeyBacktab: func() {
-			if len(f.Members) > 0 {
-				f.CurrentMemberInFocus--
-				if f.CurrentMemberInFocus < 0 { //  f.CurrentMemberInFocus %= len(f.Members)
-					f.CurrentMemberInFocus = len(f.Members)
-				}
-				app.SetFocus(f.Members[f.CurrentMemberInFocus])
-			}
-		},
-	})
-}
 
 func (f *eFlex) setKeyToFunc() { // TODO: see repeated method on other types
 	f.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
@@ -294,9 +303,7 @@ func (f *eFlex) setKeyToFunc() { // TODO: see repeated method on other types
 // eGrid definition and methods
 type eGrid struct {
 	*tview.Grid
-	*inputCapturer
-	Members              []tview.Primitive // equivalent to the unexported member 'items' in tview.Grid
-	CurrentMemberInFocus int               // index of the current member that has focus
+    *layoutContainer
 	HelpMessage          string
 	parent               *ePages // parent is used to display help message and navigate back to previous page (TODO: maybe the grid can do this itself ?)
 }
@@ -304,11 +311,13 @@ type eGrid struct {
 func NewEgrid(parentPages *ePages) *eGrid {
 	g := eGrid{
 		Grid:                 tview.NewGrid(),
-		Members:              []tview.Primitive{},
-		CurrentMemberInFocus: 0,
+        layoutContainer: &layoutContainer{
+            Members:              []tview.Primitive{},
+            CurrentMemberInFocus: 0,
+            inputCapturer:        &inputCapturer{keyToFunc: make(map[tcell.Key]func())},
+        },
 		HelpMessage:          "NO HELP MESSAGE (maybe submit a pull request ?)",
 		parent:               parentPages,
-		inputCapturer:        &inputCapturer{keyToFunc: make(map[tcell.Key]func())},
 	}
 	g.inputCapturer.UpdateKeyToFunc(map[tcell.Key]func(){
 		tcell.Key('?'): func() { g.DisplayHelp() },
@@ -329,29 +338,6 @@ func (g *eGrid) DisplayHelp() {
 	g.parent.DisplayHelpMessage(g.HelpMessage)
 }
 
-// If only we can shift focus to grid/flex members without a tview.Application...
-func (g *eGrid) SetShiftFocusFunc(app *tview.Application) {
-	g.UpdateKeyToFunc(map[tcell.Key]func(){
-		tcell.KeyTab: func() {
-			if len(g.Members) > 0 {
-				g.CurrentMemberInFocus++
-				if g.CurrentMemberInFocus >= len(g.Members) { //  g.CurrentMemberInFocus %= len(g.Members)
-					g.CurrentMemberInFocus = 0
-				}
-				app.SetFocus(g.Members[g.CurrentMemberInFocus])
-			}
-		},
-		tcell.KeyBacktab: func() {
-			if len(g.Members) > 0 {
-				g.CurrentMemberInFocus--
-				if g.CurrentMemberInFocus < 0 { //  g.CurrentMemberInFocus %= len(g.Members)
-					g.CurrentMemberInFocus = len(g.Members) - 1
-				}
-				app.SetFocus(g.Members[g.CurrentMemberInFocus])
-			}
-		},
-	})
-}
 
 func (g *eGrid) setKeyToFunc() { // TODO: see repeated method on other types
 	g.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {

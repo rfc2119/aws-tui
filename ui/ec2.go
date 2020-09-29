@@ -180,7 +180,7 @@ func (ec2svc *ec2Service) InitView() {
 	gridEditVolume.EAddItem(inputFieldVolumeSize, 1, 0, 1, 2, 0, 0, false)
 	gridEditVolume.EAddItem(radioButtonVolumeStatus, 0, 2, 2, 1, 0, 0, false) // TODO: iops
 	gridEditVolume.EAddItem(tableEditVolume, 2, 0, 1, 3, 20, 40, false)
-	gridEditVolume.SetShiftFocusFunc(ec2svc.MainApp)
+	ec2svc.mainUI.enableShiftingFocus(gridEditVolume.layoutContainer)
 
 	ec2svc.RootPage.EAddPage("Instances", instancesFlex, true, false) // TODO: page names and such; resize=true, visible=false
 	ec2svc.RootPage.EAddPage("Volumes", volumesFlex, true, false)     // TODO: page names and such; resize=true, visible=false
@@ -245,10 +245,10 @@ func (ec2svc *ec2Service) setCallbacks() {
 	instancesFlexCallBacks := map[tcell.Key]func(){
 		tcell.KeyCtrlL: func() { ec2svc.chooseAMIFilters() },
 	}
-	instancesFlex.SetShiftFocusFunc(ec2svc.MainApp)
+	ec2svc.mainUI.enableShiftingFocus(instancesFlex.layoutContainer)
 	instancesFlex.UpdateKeyToFunc(instancesFlexCallBacks)
 
-	editInstancesGrid.SetShiftFocusFunc(ec2svc.MainApp)
+	ec2svc.mainUI.enableShiftingFocus(editInstancesGrid.layoutContainer)
 
 	// Radio button for instance status
 	instanceStatusRadioButtonCallBacks := map[tcell.Key]func(){
@@ -415,7 +415,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 	radioButtonVolumeStatus.UpdateKeyToFunc(radioButtonVolumeStatusCallbacks)
 
 	// The flex container holding the volumes table
-	volumesFlex.SetShiftFocusFunc(ec2svc.MainApp)
+	ec2svc.mainUI.enableShiftingFocus(volumesFlex.layoutContainer)
 }
 
 // TODO: could this be a generic filter box ?
