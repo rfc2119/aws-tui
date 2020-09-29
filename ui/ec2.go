@@ -50,7 +50,7 @@ const (
     r               Refresh list of volumes
 	e               Edit volume (WIP)
 	`
-    HELP_EBS_EDIT_VOL =`
+	HELP_EBS_EDIT_VOL = `
 # Attach/Detach to/from EC2 instances
 You can attach instances only available in the same AZ as the volume. You can create io1 volumes can be attached to multiple instances (see https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-volumes-multi.html).
 
@@ -62,7 +62,6 @@ On linux Devices, names /dev/sd{f-p} are valid "mount points". The kernel may re
 
 # Type, size and IOPS (if applicable)
 `
-
 )
 
 // global ui elements (TODO: perhaps i should make them local somehow)
@@ -136,7 +135,6 @@ func (ec2svc *ec2Service) InitView() {
 
 	instancesFlex.HelpMessage = HELP_EC2_MAIN
 	instancesFlex.SetDirection(tview.FlexColumn)
-	instancesFlex.SetFullScreen(true)
 	instancesFlex.EAddItem(instancesTable, 0, 2, true)
 	instancesFlex.EAddItem(description, 0, 1, false)
 
@@ -159,7 +157,6 @@ func (ec2svc *ec2Service) InitView() {
 
 	volumesFlex.HelpMessage = HELP_EBS_MAIN
 	volumesFlex.SetDirection(tview.FlexColumn)
-	volumesFlex.SetFullScreen(true)
 	volumesFlex.EAddItem(volumesTable, 0, 1, true)
 
 	inputFieldVolumeIops.SetLabel("IOPS")
@@ -173,7 +170,7 @@ func (ec2svc *ec2Service) InitView() {
 	tableEditVolume.Select(1, 1)
 	tableEditVolume.SetFixed(0, 2)
 
-    gridEditVolume.HelpMessage = HELP_EBS_EDIT_VOL
+	gridEditVolume.HelpMessage = HELP_EBS_EDIT_VOL
 	gridEditVolume.SetRows(3, 3, 0)
 	gridEditVolume.SetColumns(10, 0, 20)
 	gridEditVolume.EAddItem(dropDownVolumeType, 0, 0, 1, 2, 0, 0, true) // row, col, rowSpan, colSpan, minGridHeight, minGridWidth, focus
@@ -192,9 +189,9 @@ func (ec2svc *ec2Service) InitView() {
 // Fills ui elements with appropriate initial data
 func (ec2svc *ec2Service) drawElements() {
 	// Draw tables
-	drawFirstRowForAllTables()
-	ec2svc.fillInstancesTable()
-	ec2svc.fillVolumesTable()
+	drawFirstRowTable(nil)
+	fillInstancesTable(ec2svc)
+	fillVolumesTable(ec2svc)
 
 	// Instance types allowed in current region
 	var (
@@ -226,7 +223,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 			row, _ := instancesTable.GetSelection() // TODO: multi selection
 			state := ssm.State{Name: instancesTable.GetCell(row, COL_EC2_STATE).Text}
 			if err := EC2InstancesStateMachine.GoToState(state, false); err != nil {
-				log.Println(err)
+				ec2svc.StatusBar.SetText(err.Error())
 				return
 			}
 			configureRadioButton(instanceStatusRadioButton, EC2InstancesStateMachine)
@@ -236,7 +233,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 		},
 		tcell.Key('r'): func() {
 			ec2svc.StatusBar.SetText("refreshing instances list")
-			ec2svc.fillInstancesTable()
+			fillInstancesTable(ec2svc)
 		},
 	}
 	instancesTable.UpdateKeyToFunc(instancesTableCallbacks)
@@ -263,31 +260,36 @@ func (ec2svc *ec2Service) setCallbacks() {
 				case "start": // TODO: magic names
 					if _, err := ec2svc.Model.StartEC2Instances(instanceIds); err != nil {
 						ec2svc.showConfirmationBox(err.Error(), false, nil) // TODO: spread
-						ec2svc.StatusBar.SetText(err.Error())        // TODO: logging
+						ec2svc.StatusBar.SetText(err.Error())               // TODO: logging
 						return
 					}
 				case "stop":
 					if _, err := ec2svc.Model.StopEC2Instances(instanceIds, false, false); err != nil {
+						ec2svc.showConfirmationBox(err.Error(), false, nil) // TODO: spread
 						// ec2svc.StatusBar.SetText(err.Error())	// TODO: logging
 						return
 					}
 				case "hibernate":
 					if _, err := ec2svc.Model.StopEC2Instances(instanceIds, false, true); err != nil { // hibernate=true
+						ec2svc.showConfirmationBox(err.Error(), false, nil) // TODO: spread
 						// ec2svc.StatusBar.SetText(err.Error())	// TODO: logging
 						return
 					}
 				case "stop (force)":
 					if _, err := ec2svc.Model.StopEC2Instances(instanceIds, true, false); err != nil { // force=true
+						ec2svc.showConfirmationBox(err.Error(), false, nil) // TODO: spread
 						// ec2svc.StatusBar.SetText(err.Error())	// TODO: logging
 						return
 					}
 				case "reboot":
 					if err := ec2svc.Model.RebootEC2Instances(instanceIds); err != nil {
+						ec2svc.showConfirmationBox(err.Error(), false, nil) // TODO: spread
 						// ec2svc.StatusBar.SetText(err.Error())	// TODO: logging
 						return
 					}
 				case "terminate":
 					if _, err := ec2svc.Model.TerminateEC2Instances(instanceIds); err != nil {
+						ec2svc.showConfirmationBox(err.Error(), false, nil) // TODO: spread
 						// ec2svc.StatusBar.SetText(err.Error())	// TODO: logging
 						return
 					}
@@ -309,44 +311,27 @@ func (ec2svc *ec2Service) setCallbacks() {
 				return
 			}
 			if err := ec2svc.Model.ChangeInstanceType(instancesTable.GetCell(row, COL_EC2_ID).Text, text); err != nil {
+				ec2svc.showConfirmationBox(err.Error(), false, nil) // TODO: spread
 				ec2svc.StatusBar.SetText(err.Error())
 			}
 		})
 	})
 
 	volumesTableCallBacks := map[tcell.Key]func(){
-		tcell.Key('r'): func() { ec2svc.fillVolumesTable() },
+		tcell.Key('r'): func() { fillVolumesTable(ec2svc) },
 		tcell.Key('e'): func() {
 			// Configuring the state radio button
 			row, _ := volumesTable.GetSelection()
 			state := ssm.State{Name: volumesTable.GetCell(row, COL_EBS_STATE).Text}
 			if err := EBSVolumesStateMachine.GoToState(state, false); err != nil {
-				log.Println(err)
+				ec2svc.StatusBar.SetText(err.Error())
 				return
 			}
 			configureRadioButton(radioButtonVolumeStatus, EBSVolumesStateMachine)
 			inputFieldVolumeIops.SetText(volumesTable.GetCell(row, COL_EBS_IOPS).Text) //TODO: put in main screen
 			inputFieldVolumeSize.SetText(volumesTable.GetCell(row, COL_EBS_SIZE).Text)
 			// dropDownVolumeType.SetIndex()       // TODO
-			// TODO: generalize table drawing
-			for rowIdx, info := range ec2svc.volumes[row-1].Attachments {
-				items := []interface{}{info.InstanceId, info.State, info.Device, info.AttachTime}
-				for colIdx, item := range items {
-					cell := tview.NewTableCell(stringFromAWSVar(item))
-					tableEditVolume.SetCell(rowIdx+1, colIdx, cell)
-				}
-			}
-			tableEditVolume.SetSelectionChangedFunc(func(row, col int) {
-				if row <= 1 {
-					return
-				}
-				state := ssm.State{Name: volumesTable.GetCell(row, COL_EBS_STATE).Text}
-				if err := EBSVolumesStateMachine.GoToState(state, false); err != nil {
-					log.Println(err)
-					return
-				}
-				configureRadioButton(radioButtonVolumeStatus, EBSVolumesStateMachine)
-			})
+			fillTableEditVolume(ec2svc)
 			ec2svc.showGenericModal(gridEditVolume, 50, 20, true)
 		},
 	}
@@ -369,11 +354,14 @@ func (ec2svc *ec2Service) setCallbacks() {
 					form := tview.NewForm()
 					inputFieldInstanceId := tview.NewInputField().SetLabel("Instance ID")
 					inputFieldDeviceName := tview.NewInputField().SetLabel("Device Name")
-                    inputFieldInstanceId.SetFieldWidth(19)  // TODO: acceptance func
-                    inputFieldDeviceName.SetFieldWidth(10)
+					inputFieldInstanceId.SetFieldWidth(19) // TODO: acceptance func
+					inputFieldDeviceName.SetFieldWidth(10)
+					buttonCancelFunc := func() { ec2svc.RootPage.ESwitchToPreviousPage() }
 					buttonAttachFunc := func() {
 						if _, err := ec2svc.Model.AttachVolume(volId, inputFieldInstanceId.GetText(), inputFieldDeviceName.GetText()); err != nil {
 							ec2svc.showConfirmationBox(err.Error(), true, nil)
+						} else {
+							buttonCancelFunc()
 						}
 					}
 					// Set auto complete for the current selected text. copied from demos/inputfield
@@ -392,6 +380,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 						return
 					})
 					form.AddButton("Attach", buttonAttachFunc)
+					form.AddButton("Cancel", buttonCancelFunc)
 					form.AddFormItem(inputFieldInstanceId)
 					form.AddFormItem(inputFieldDeviceName)
 					form.SetTitle(fmt.Sprintf("%s in %s", volId, az))
@@ -416,6 +405,19 @@ func (ec2svc *ec2Service) setCallbacks() {
 
 	// The flex container holding the volumes table
 	ec2svc.mainUI.enableShiftingFocus(volumesFlex.layoutContainer)
+
+	// The table for listing attached EC2 instances to EBS volumes
+	tableEditVolume.SetSelectionChangedFunc(func(row, col int) {
+		if row <= 1 {
+			return
+		}
+		state := ssm.State{Name: volumesTable.GetCell(row, COL_EBS_STATE).Text}
+		if err := EBSVolumesStateMachine.GoToState(state, false); err != nil {
+			ec2svc.StatusBar.SetText(err.Error())
+			return
+		}
+		configureRadioButton(radioButtonVolumeStatus, EBSVolumesStateMachine)
+	})
 }
 
 // TODO: could this be a generic filter box ?
@@ -493,38 +495,6 @@ func (ec2svc *ec2Service) chooseAMIFilters() {
 	form.AddFormItem(inputField)
 	form.SetTitle("Filter AMIs").SetBorder(true)
 	ec2svc.showGenericModal(form, 80, 10, true) // 80x10 seems good for my screen
-}
-
-// TODO: refactor
-// Fills the table for EBS volumes with volume data
-func (ec2svc *ec2Service) fillVolumesTable() {
-	var err error
-	if ec2svc.volumes, err = ec2svc.Model.ListVolumes(); err != nil {
-		ec2svc.StatusBar.SetText(err.Error())
-	}
-	for rowIdx, volume := range ec2svc.volumes {
-		items := []interface{}{volume.VolumeId, volume.Size, volume.VolumeType, volume.Iops, volume.State}
-		for colIdx, item := range items {
-			cell := tview.NewTableCell(stringFromAWSVar(item))
-			volumesTable.SetCell(rowIdx+1, colIdx, cell)
-		}
-	}
-}
-
-// Fills the table for EC2 instances with instance data
-func (ec2svc *ec2Service) fillInstancesTable() {
-	var err error
-
-	if ec2svc.instances, err = ec2svc.Model.GetEC2Instances(); err != nil { // directly invokes a method on the model
-		ec2svc.StatusBar.SetText(err.Error())
-	}
-	for rowIdx, instance := range ec2svc.instances {
-		items := []interface{}{instance.InstanceId, instance.ImageId, instance.InstanceType, instance.State.Name}
-		for colIdx, item := range items {
-			cell := tview.NewTableCell(stringFromAWSVar(item))
-			instancesTable.SetCell(rowIdx+1, colIdx, cell)
-		}
-	}
 }
 
 // Dispatches goroutines to monitor changes. Assigns listeners to each action
@@ -636,22 +606,87 @@ func configureRadioButton(rButton *RadioButtons, sm *common.EStateMachine) {
 	}
 }
 
-// Draws the first row in all tables
-func drawFirstRowForAllTables() { // Hardcoded all the way (TODO?)
-	tables := []*eTable{tableEditVolume, volumesTable, instancesTable, instancesTableAMI}
-	allColNames := [][]string{
-		[]string{"Instance ID", "State", "Device", "Date Attached"},
-		[]string{"ID", "Size (GiB)", "Type", "IOPS", "State"},
-		[]string{"ID", "AMI", "Type", "State"},
-		[]string{"ID", "State", "Arch", "Creation Date", "Name", "Owner ID"},
+// TODO: generalize table drawing
+// Fills the table attached instances to EBS volumes
+func fillTableEditVolume(ec2svc *ec2Service) {
+	row, _ := volumesTable.GetSelection()
+	attachments := ec2svc.volumes[row-1].Attachments
+	if len(attachments) == 0 { // clear table
+		tableEditVolume.Clear()
+		drawFirstRowTable(tableEditVolume)
+		return
 	}
+	for rowIdx, info := range attachments {
+		items := []interface{}{info.InstanceId, info.State, info.Device, info.AttachTime}
+		for colIdx, item := range items {
+			cell := tview.NewTableCell(stringFromAWSVar(item))
+			tableEditVolume.SetCell(rowIdx+1, colIdx, cell)
+		}
+	}
+}
 
-	for idx := 0; idx < len(tables); idx++ {
-		func(table *eTable, colNames []string) {
-			for firstColIdx := 0; firstColIdx < len(colNames); firstColIdx++ {
-				table.SetCell(0, firstColIdx,
-					tview.NewTableCell(colNames[firstColIdx]).SetAlign(tview.AlignCenter).SetSelectable(false).SetAttributes(tcell.AttrBold))
-			}
-		}(tables[idx], allColNames[idx])
+// TODO: generalize table drawing
+// Fills the table for EBS volumes with volume data
+func fillVolumesTable(ec2svc *ec2Service) {
+	var err error
+	if ec2svc.volumes, err = ec2svc.Model.ListVolumes(); err != nil {
+		ec2svc.showConfirmationBox(err.Error(), true, nil)
+	}
+	if len(ec2svc.volumes) == 0 { // Clear table
+		volumesTable.Clear()
+		drawFirstRowTable(volumesTable)
+		return
+	}
+	for rowIdx, volume := range ec2svc.volumes {
+		items := []interface{}{volume.VolumeId, volume.Size, volume.VolumeType, volume.Iops, volume.State}
+		for colIdx, item := range items {
+			cell := tview.NewTableCell(stringFromAWSVar(item))
+			volumesTable.SetCell(rowIdx+1, colIdx, cell)
+		}
+	}
+}
+
+// TODO: generalize table drawing
+// Fills the table for EC2 instances with instance data
+func fillInstancesTable(ec2svc *ec2Service) {
+	var err error
+
+	if ec2svc.instances, err = ec2svc.Model.GetEC2Instances(); err != nil { // directly invokes a method on the model
+		ec2svc.showConfirmationBox(err.Error(), true, nil)
+	}
+	if len(ec2svc.instances) == 0 { // Clear table
+		instancesTable.Clear()
+		drawFirstRowTable(instancesTable)
+		return
+	}
+	for rowIdx, instance := range ec2svc.instances {
+		items := []interface{}{instance.InstanceId, instance.ImageId, instance.InstanceType, instance.State.Name}
+		for colIdx, item := range items {
+			cell := tview.NewTableCell(stringFromAWSVar(item))
+			instancesTable.SetCell(rowIdx+1, colIdx, cell)
+		}
+	}
+}
+
+// Draws the first row for specific table, or all tables if no table was provided
+func drawFirstRowTable(t *eTable) { // Hardcoded all the way (TODO?)
+	tableToColNames := map[*eTable][]string{
+		tableEditVolume:   []string{"Instance ID", "State", "Device", "Date Attached"},
+		volumesTable:      []string{"ID", "Size (GiB)", "Type", "IOPS", "State"},
+		instancesTable:    []string{"ID", "AMI", "Type", "State"},
+		instancesTableAMI: []string{"ID", "State", "Arch", "Creation Date", "Name", "Owner ID"},
+	}
+	drawRowFunc := func(table *eTable, colNames []string) {
+		for firstColIdx := 0; firstColIdx < len(colNames); firstColIdx++ {
+			table.SetCell(0, firstColIdx,
+				tview.NewTableCell(colNames[firstColIdx]).SetAlign(tview.AlignCenter).SetSelectable(false).SetAttributes(tcell.AttrBold))
+		}
+	}
+	if colNames, ok := tableToColNames[t]; ok {
+		drawRowFunc(t, colNames)
+		return
+	}
+	for ta, co := range tableToColNames {
+		drawRowFunc(ta, co)
 	}
 }

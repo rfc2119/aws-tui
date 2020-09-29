@@ -73,7 +73,7 @@ func main() {
 	tree.SetSelectedFunc(func(node *tview.TreeNode) {
 		children := node.GetChildren()
 		if len(children) == 0 && pages.HasPage(node.GetText()) { // go to page
-			pages.ESwitchToPage(node.GetText())
+			pages.ESwitchToPage(node.GetText()) // TODO: unify page names
 
 		} else {
 			node.SetExpanded(!node.IsExpanded())

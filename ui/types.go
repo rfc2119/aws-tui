@@ -2,7 +2,7 @@ package ui
 
 import (
 	"fmt"
-    // "log"
+	// "log"
 	"reflect"
 	"time"
 
@@ -36,7 +36,7 @@ type mainUI struct {
 }
 
 // If only we can shift focus to grid/flex members without a tview.Application...
-func (u mainUI) enableShiftingFocus(l *layoutContainer){
+func (u mainUI) enableShiftingFocus(l *layoutContainer) {
 
 	l.inputCapturer.UpdateKeyToFunc(map[tcell.Key]func(){
 		tcell.KeyTab: func() {
@@ -67,24 +67,24 @@ func (u mainUI) showConfirmationBox(msg string, rememberLastPage bool, doneFunc 
 		AddButtons([]string{"Ok", "Cancel"}).
 		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 			if buttonLabel == "Ok" && doneFunc != nil {
-				go func(){
-                    doneFunc()  // TODO: it's a mess with nested dialogues
-                    u.MainApp.Draw()    // The key to get this done right
-                }()
+				go func() {
+					doneFunc()       // TODO: it's a mess with nested dialogues
+					u.MainApp.Draw() // The key to get this done right
+				}()
 			}
 			u.RootPage.ESwitchToPreviousPage()
 			u.RootPage.ShowPage(u.RootPage.GetPreviousPageName()) // +1
 		})
-    // TODO: remove this and put a fixed page name. see if anything crashes
-    pageName := fmt.Sprintf("%p", &modal)
-    if rememberLastPage {
-        u.RootPage.EAddAndSwitchToPage(pageName, modal, false) // resize=false
-        u.RootPage.ShowPage(u.RootPage.GetCurrentPageName()) // +1
-    } else {
-        currPageName := u.RootPage.GetCurrentPageName()
-        u.RootPage.AddAndSwitchToPage(pageName, modal, false) // resize=false
-        u.RootPage.ShowPage(currPageName) // +1
-    }
+	// TODO: remove this and put a fixed page name. see if anything crashes
+	pageName := fmt.Sprintf("%p", &modal)
+	if rememberLastPage {
+		u.RootPage.EAddAndSwitchToPage(pageName, modal, false) // resize=false
+		u.RootPage.ShowPage(u.RootPage.GetCurrentPageName())   // +1
+	} else {
+		currPageName := u.RootPage.GetCurrentPageName()
+		u.RootPage.AddAndSwitchToPage(pageName, modal, false) // resize=false
+		u.RootPage.ShowPage(currPageName)                     // +1
+	}
 
 }
 
@@ -108,18 +108,20 @@ func (u mainUI) showGenericModal(p tview.Primitive, width, height int, rememberL
 		SetRows(0, height, 0).
 		AddItem(p, 1, 1, 1, 1, 0, 0, true) // focus=true
 		// }
-    if g, ok := p.(*eGrid); ok { centeredModal.HelpMessage = g.HelpMessage }    // TODO: eFlex
-    // TODO: remove this and put a fixed page name. see if anything crashes
-    pageName := fmt.Sprintf("%p", &centeredModal)
-    if rememberLastPage {
-        u.RootPage.EAddAndSwitchToPage(pageName, centeredModal, true) // resize=true
-        u.RootPage.ShowPage(u.RootPage.GetPreviousPageName())                 // redraw on top (bottom ?) of the box
-    } else {
-        currPageName := u.RootPage.GetCurrentPageName()
-        u.RootPage.AddAndSwitchToPage(pageName, centeredModal, true) // resize=true
-        u.RootPage.ShowPage(currPageName)       // redraw on top (bottom ?) of the box
-    }
-
+	if g, ok := p.(*eGrid); ok {
+		centeredModal.HelpMessage = g.HelpMessage
+	} // TODO: eFlex
+	// TODO: remove this and put a fixed page name. see if anything crashes
+	// pageName := fmt.Sprintf("%p", &centeredModal)
+	pageName := "centered modal"
+	if rememberLastPage {
+		u.RootPage.EAddAndSwitchToPage(pageName, centeredModal, true) // resize=true
+		u.RootPage.ShowPage(u.RootPage.GetPreviousPageName())         // redraw on top (bottom ?) of the box
+	} else {
+		currPageName := u.RootPage.GetCurrentPageName()
+		u.RootPage.AddAndSwitchToPage(pageName, centeredModal, true) // resize=true
+		u.RootPage.ShowPage(currPageName)                            // redraw on top (bottom ?) of the box
+	}
 
 }
 
@@ -128,7 +130,6 @@ func (u mainUI) showGenericModal(p tview.Primitive, width, height int, rememberL
 // 	*mainUI
 // 	*aws.Client
 // }
-
 
 // TODO: generalize
 // uses SetInputCapture on primitive
@@ -202,9 +203,9 @@ func (p *ePages) EAddPage(name string, item tview.Primitive, resize, visible boo
 // Use this to go forward one page. Do not use it if you intend not to go back (confirmation boxes for example). Instead, use the normal tview.SwitchToPage or tview.AddAndSwitchToPage
 func (p *ePages) ESwitchToPage(name string) *ePages {
 	currentPageName := p.GetCurrentPageName()
-    if p.GetPreviousPageName() != currentPageName {
-        p.pageStack = append(p.pageStack, currentPageName)
-    }
+	if p.GetPreviousPageName() != currentPageName {
+		p.pageStack = append(p.pageStack, currentPageName)
+	}
 	p.SwitchToPage(name)
 	return p
 
@@ -251,21 +252,21 @@ func (p *ePages) GetCurrentPageName() string {
 // eFlex definition and methods
 type eFlex struct {
 	*tview.Flex
-    *layoutContainer
-	HelpMessage          string
-	parent               *ePages // parent is used to display help message and navigate back to previous page (TODO: maybe the flex can do this itself ?)
+	*layoutContainer
+	HelpMessage string
+	parent      *ePages // parent is used to display help message and navigate back to previous page (TODO: maybe the flex can do this itself ?)
 }
 
 func NewEFlex(parentPages *ePages) *eFlex {
 	f := eFlex{
-		Flex:                 tview.NewFlex(),
-        layoutContainer: &layoutContainer{
-            Members:              []tview.Primitive{},
-            CurrentMemberInFocus: 0,
-            inputCapturer:        &inputCapturer{keyToFunc: make(map[tcell.Key]func())},
-        },
-		HelpMessage:          "NO HELP MESSAGE (maybe submit a pull request ?)",
-		parent:               parentPages,
+		Flex: tview.NewFlex(),
+		layoutContainer: &layoutContainer{
+			Members:              []tview.Primitive{},
+			CurrentMemberInFocus: 0,
+			inputCapturer:        &inputCapturer{keyToFunc: make(map[tcell.Key]func())},
+		},
+		HelpMessage: "NO HELP MESSAGE (maybe submit a pull request ?)",
+		parent:      parentPages,
 	}
 	f.inputCapturer.UpdateKeyToFunc(map[tcell.Key]func(){
 		tcell.Key('?'): func() { f.DisplayHelp() },
@@ -281,7 +282,6 @@ func (f *eFlex) EAddItem(p tview.Primitive, fixedSize, proportion int, focus boo
 func (f *eFlex) DisplayHelp() {
 	f.parent.DisplayHelpMessage(f.HelpMessage)
 }
-
 
 func (f *eFlex) setKeyToFunc() { // TODO: see repeated method on other types
 	f.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
@@ -303,21 +303,21 @@ func (f *eFlex) setKeyToFunc() { // TODO: see repeated method on other types
 // eGrid definition and methods
 type eGrid struct {
 	*tview.Grid
-    *layoutContainer
-	HelpMessage          string
-	parent               *ePages // parent is used to display help message and navigate back to previous page (TODO: maybe the grid can do this itself ?)
+	*layoutContainer
+	HelpMessage string
+	parent      *ePages // parent is used to display help message and navigate back to previous page (TODO: maybe the grid can do this itself ?)
 }
 
 func NewEgrid(parentPages *ePages) *eGrid {
 	g := eGrid{
-		Grid:                 tview.NewGrid(),
-        layoutContainer: &layoutContainer{
-            Members:              []tview.Primitive{},
-            CurrentMemberInFocus: 0,
-            inputCapturer:        &inputCapturer{keyToFunc: make(map[tcell.Key]func())},
-        },
-		HelpMessage:          "NO HELP MESSAGE (maybe submit a pull request ?)",
-		parent:               parentPages,
+		Grid: tview.NewGrid(),
+		layoutContainer: &layoutContainer{
+			Members:              []tview.Primitive{},
+			CurrentMemberInFocus: 0,
+			inputCapturer:        &inputCapturer{keyToFunc: make(map[tcell.Key]func())},
+		},
+		HelpMessage: "NO HELP MESSAGE (maybe submit a pull request ?)",
+		parent:      parentPages,
 	}
 	g.inputCapturer.UpdateKeyToFunc(map[tcell.Key]func(){
 		tcell.Key('?'): func() { g.DisplayHelp() },
@@ -337,7 +337,6 @@ func (g *eGrid) EAddItem(p tview.Primitive, row, column, rowSpan, colSpan, minGr
 func (g *eGrid) DisplayHelp() {
 	g.parent.DisplayHelpMessage(g.HelpMessage)
 }
-
 
 func (g *eGrid) setKeyToFunc() { // TODO: see repeated method on other types
 	g.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
@@ -512,24 +511,25 @@ func (r *RadioButtons) setKeyToFunc() { // TODO: see repeated method on other ty
 // A non-focusable status bar
 type StatusBar struct {
 	tview.TextView
-    // app *tview.Application // Needed to properly clear text. Can be omitted
+	// app *tview.Application // Needed to properly clear text. Can be omitted
 	durationInSeconds int // Duration after which the status bar is  cleared
 }
 
 func NewStatusBar() *StatusBar {
 
 	bar := StatusBar{
-		TextView:          *tview.NewTextView(),
-        // app: app,
+		TextView: *tview.NewTextView(),
+		// app: app,
 		durationInSeconds: 3, // TODO: Parameter
 	}
 	// TODO: this is a naiive way of clearing the text bar on regular intervals; no syncronization or context is used
 	bar.SetChangedFunc(func() {
-        // go bar.app.Draw()          // hmmmmmm
+		// go bar.app.Draw()          // hmmmmmm
 		time.Sleep(time.Duration(bar.durationInSeconds) * time.Second)
 		bar.Clear() // Clear() does not trigger a changed event
 	})
 	// bar.SetScrollable(false) // Helps trimming the internal buffer to only the viewable area
+	bar.SetBackgroundColor(tcell.ColorBlue)
 	return &bar
 }
 
@@ -556,8 +556,8 @@ func stringFromAWSVar(awsVar interface{}) string {
 		// conversion from int to string yields a string of one rune,
 		// not a string of digits (did you mean fmt.Sprint(x)?)
 		t = fmt.Sprint(aws.Int64Value(v)) // hmmmm
-    case *time.Time:
-        t = fmt.Sprint(aws.TimeValue(v))
+	case *time.Time:
+		t = fmt.Sprint(aws.TimeValue(v))
 	default:
 		switch reflect.TypeOf(v).Kind() {
 		case reflect.String: // should be a type derived from string ?
