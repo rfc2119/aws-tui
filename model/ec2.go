@@ -213,11 +213,41 @@ func (mdl *EC2Model) DispatchWatchers() {
 
 // watcher1 watches the status of all EC2 instances. A similar function in the view component "listner1" should make use of this information
 func watcher1(client *ec2.Client, ch chan<- common.Action, describeAll bool) {
+    var statuses []ec2.InstanceStatus
 	req := client.DescribeInstanceStatusRequest(&ec2.DescribeInstanceStatusInput{
-		IncludeAllInstances: &describeAll,
+		IncludeAllInstances: aws.Bool(describeAll),
 	})
-	resp, err := req.Send(context.TODO())
-    printAWSError(err)
-	sendMe := common.Action{Type: common.ACTION_INSTANCE_STATUS_UPDATE, Data: common.InstanceStatusesUpdate(resp.InstanceStatuses)} // TODO: paginator
-	ch <- sendMe
+    paginator := ec2.NewDescribeInstanceStatusPaginator(req)
+    for paginator.Next(context.TODO()){
+        statuses = append(statuses, paginator.CurrentPage().InstanceStatuses...)
+    }
+
+    if paginator.Err() != nil {
+        printAWSError(paginator.Err())      // TODO: logging and error handling
+        return
+    }
+	action := common.Action{
+        Type: common.ACTION_INSTANCES_STATUS_UPDATE,
+        Data: statuses,
+    }
+	ch <- action
+}
+func watcher2(client *ec2.Client, ch chan<- common.Action) {        // TODO: filters ?
+
+    var modifications []ec2.VolumeModification
+    req := client.DescribeVolumesModificationsRequest(&ec2.DescribeVolumesModificationsInput{})
+    paginator := ec2.NewDescribeVolumesModificationsPaginator(req)
+    for paginator.Next(context.TODO()){
+        modifications = append(modifications, paginator.CurrentPage().VolumesModifications...)
+    }
+
+    if paginator.Err() != nil {
+        printAWSError(paginator.Err())      // TODO: logging and error handling
+        return
+    }
+	action := common.Action{
+        Type: common.ACTION_VOLUME_MODIFIED,
+        Data: modifications,
+    }
+    ch<- action
 }

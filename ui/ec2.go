@@ -59,7 +59,7 @@ If your volume state becomes *detaching*, it is likely that you need the "Force 
     > Use this option only as a last resort to detach a volume from a failed instance, or if you are detaching a volume with the intention of deleting it. The instance doesn't get an opportunity to flush file system caches or file system metadata. If you use this option, you must perform the file system check and repair procedures
     
 # Device names
-On linux Devices, names /dev/sd{f-p} are valid "mount points". The kernel may rename these internally to something like /dev/xvd{f-p}. For HVM instances, /dev/sda1 or /dev/xvda is reserved for root devices.See https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html for a complete list of valid names and considerations
+On linux Devices, names /dev/sd{f-p} are valid "mount points". The kernel may rename these internally to something like /dev/xvd{f-p}. For HVM instances, /dev/sda1 or /dev/xvda is reserved for root devices. See https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html for a complete list of valid names and considerations
 
 # Type, size and IOPS
 Available types are abbreviated as the following. Not all volumes can have its type changed.Setting IOPS is only available for io{1,2} types
@@ -344,7 +344,10 @@ func (ec2svc *ec2Service) setCallbacks() {
 				return
 			}
 			configureRadioButton(radioButtonVolumeStatus, EBSVolumesStateMachine)
-			inputFieldVolumeIops.SetText(volumesTable.GetCell(row, COL_EBS_IOPS).Text) //TODO: put in main screen
+            if iops := volumesTable.GetCell(row, COL_EBS_IOPS).Text; iops != "0" {
+                inputFieldVolumeIops.SetFieldWidth(5)
+                inputFieldVolumeIops.SetText(iops)
+            } else { inputFieldVolumeIops.SetFieldWidth(-1) }   // No IOPS for magnetic HDDs
 			inputFieldVolumeSize.SetText(volumesTable.GetCell(row, COL_EBS_SIZE).Text)
 			// dropDownVolumeType.SetIndex()       // TODO
 			fillTableEditVolume(ec2svc)
@@ -468,7 +471,6 @@ func (ec2svc *ec2Service) setDropDownsCallbacks(){
     dropDownVolumeType.SetSelectedFunc(func(newType string, index int){
         row, _ := volumesTable.GetSelection()
         oldType := volumesTable.GetCell(row, COL_EBS_TYPE).Text
-        ec2svc.StatusBar.SetText(oldType)
         if oldType != newType {
             var (
                 iops int64 = -1
@@ -574,14 +576,18 @@ func (ec2svc *ec2Service) chooseAMIFilters() {
 // Dispatches goroutines to monitor changes. Assigns listeners to each action
 func (svc *ec2Service) WatchChanges() {
 	svc.Model.DispatchWatchers()
-	go func(ch <-chan common.Action) { // listner goroutine
-		for receiveMe := range ch {
-			// switch receiveMe.Data.(type){
-			switch receiveMe.Type { // TODO: is Type useful anyway ?
-			case common.ACTION_INSTANCE_STATUS_UPDATE:
-				go listener1(receiveMe)
+	go func(ch <-chan common.Action) { // listener goroutine
+		for action := range ch {       // poll channel for eternity
+			// switch action.Data.(type){
+			switch action.Type {
+			case common.ACTION_INSTANCES_STATUS_UPDATE:
+				go listener1(action)
+            case common.ACTION_VOLUME_MODIFIED:
+                go listener2(action)
+            case common.ACTION_ERROR:
+                // TODO
 			default:
-				log.Printf("received invalid data of type %T", receiveMe.Data)
+				log.Printf("received invalid data of type %T", action.Data)
 			}
 		}
 	}(svc.Model.Channel)
@@ -590,12 +596,18 @@ func (svc *ec2Service) WatchChanges() {
 
 // listener for watcher1
 func listener1(action common.Action) {
-	statuses := action.Data.(common.InstanceStatusesUpdate)
+    var (
+        rowIdx int
+        indicesColoredRows []int
+    )
+	statuses := action.Data.([]ec2.InstanceStatus)
 	for _, status := range statuses {
-		rowIdx := rowIndexFromTable(instancesTable, *status.InstanceId) // TODO: check for -1
+		if rowIdx = rowIndexFromTable(instancesTable, *status.InstanceId); rowIdx == -1 {
+            continue
+        }
 		cell := instancesTable.GetCell(rowIdx, COL_EC2_STATE)
-		newState := string(status.InstanceState.Name)
-		if newState != cell.Text {
+		newState := stringFromAWSVar(status.InstanceState.Name)
+		if newState != cell.Text {      // State has been changed
 			// Hop to state newState and trigger the onEnter function (to get the correct color)
 			state := ssm.State{Name: newState}
 			if err := EC2InstancesStateMachine.GoToState(state, true); err != nil {
@@ -604,15 +616,21 @@ func listener1(action common.Action) {
 			}
 			colorizeRowInTable(instancesTable, rowIdx, EC2InstancesStateMachine.GetColor())
 			cell.SetText(newState) // TODO: queue draw event
-			go func() {            // TODO: this is a cheap way of clearing colors
-				time.Sleep(3 * time.Second) // TODO
-				colorizeRowInTable(instancesTable, rowIdx, tcell.ColorDefault)
-			}()
+            indicesColoredRows = append(indicesColoredRows, rowIdx)
 		}
 	}
+    go func(indices []int) {            // TODO: this is a cheap way of clearing colors
+        time.Sleep(3 * time.Second) // TODO
+        for i := 0; i < len(indices); i++ {
+            colorizeRowInTable(instancesTable, indices[i], tcell.ColorDefault)
+        }
+    }(indicesColoredRows)
 }
 
-// TODO: enum ? func (enum SummaryStatus) MarshalValue() (string, error)
+func listener2(action common.Action) {
+    // TODO
+}
+
 // ============ helper functions
 // Given an instance ID, return the row index of the instance in instancesTable t
 func rowIndexFromTable(t *eTable, instanceID string) int {

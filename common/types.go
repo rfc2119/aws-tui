@@ -1,19 +1,21 @@
 package common
 
-import (
-	"github.com/aws/aws-sdk-go-v2/service/ec2"
-)
+// import (
+// 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+// )
 
 // v2 of the aws go sdk is used
 
 const (
-	ACTION_INSTANCE_STATUS_UPDATE = iota
-	ACTION_INSTANCES_STATUS_UPDATE
-	ACTION_INSTANCE_HALP_ME
+	ACTION_INSTANCES_STATUS_UPDATE = iota
+	// ACTION_INSTANCE_STATUS_UPDATE
+	ACTION_VOLUME_MODIFIED
+    ACTION_ERROR            // TODO
+
 
 	// Defining the services themselves as numeric constants
 	// Used onwards to tweak service names and configs. This will probably be replaced
-	SERVICE_EC2
+	SERVICE_EC2     // EBS included (w/o snapshot management)
     SERVICE_IAM
 
 	// filters
@@ -275,10 +277,10 @@ type Action struct {
 	Data interface{}
 }
 
+// UPDATE: will deprecate these for now
 // these are the manually defined data structures that any first party
 // should expect when receiving/sending an action. these structures are the "data" field in the action
 // notice the similarity in using a name similar to the action, but in camel case
-type InstanceStatusUpdate ec2.InstanceStatus
-
-// TODO: is type(InstanceStatusesUpdate) different from type([]ec2.InstanceStatus)
-type InstanceStatusesUpdate []ec2.InstanceStatus
+// type InstanceStatusUpdate ec2.InstanceStatus
+// 
+// type InstanceStatusesUpdate []ec2.InstanceStatus
