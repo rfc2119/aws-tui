@@ -181,6 +181,16 @@ func (mdl *EC2Model) ModifyVolume(iops, size int64, volType, volId string) (ec2.
     }
     return *resp.ModifyVolumeOutput, nil
 }
+func (mdl *EC2Model) DeleteVolume(volId string) (ec2.DeleteVolumeOutput, error) {
+    req := mdl.model.DeleteVolumeRequest(&ec2.DeleteVolumeInput{
+	VolumeId: aws.String(volId),
+	})
+    resp, err := req.Send(context.TODO())
+    if err != nil {
+        return ec2.DeleteVolumeOutput{}, err
+    }
+    return *resp.DeleteVolumeOutput, nil
+}
 func (mdl *EC2Model) CreateVolume(iops, size int64, volType,  snapshotId, az string, isEncrypted, isMultiAttached bool) (ec2.CreateVolumeOutput, error) {
 	// TODO: tags 
     input := &ec2.CreateVolumeInput{}
@@ -198,7 +208,6 @@ func (mdl *EC2Model) CreateVolume(iops, size int64, volType,  snapshotId, az str
         return ec2.CreateVolumeOutput{}, err
     }
     return *resp.CreateVolumeOutput, nil
-
 }
 // TODO: I don't understand yet why this is better than a simple print
 func  printAWSError(err error) error {

@@ -173,7 +173,9 @@ func (ec2svc *ec2Service) InitView() {
 	dropDownVolumeType.SetLabel("Type")
 	dropDownVolumeType.SetOptions(
 		[]string{"standard", "io1", "io2", "gp2", "sc1", "st1"}, nil)
-	gridEditVolume.SetBorders(true).SetBorder(true).SetTitle("Test").SetTitleAlign(tview.AlignCenter)
+
+	// gridEditVolume.SetBorders(true).SetBorder(true).SetTitle("Test").SetTitleAlign(tview.AlignCenter)
+	gridEditVolume.SetBorders(true)
 
 	tableEditVolume.SetBorders(false)
 	tableEditVolume.SetSelectable(true, false)
@@ -413,7 +415,11 @@ func (ec2svc *ec2Service) setCallbacks() {
 						ec2svc.showConfirmationBox(err.Error(), true, nil)
 					}
 				case "Delete": // TODO
-					ec2svc.showConfirmationBox("TODO!", true, nil)
+					if _, err := ec2svc.Model.DeleteVolume(volId); err != nil {
+						ec2svc.showConfirmationBox(err.Error(), true, nil)
+						return
+					}
+					ec2svc.StatusBar.SetText("Deleting volume " + volId)
 				}
 			})
 
@@ -807,11 +813,11 @@ func configureRadioButton(rButton *RadioButtons, sm *common.EStateMachine) {
 func fillTableEditVolume(ec2svc *ec2Service) {
 	row, _ := volumesTable.GetSelection()
 	attachments := ec2svc.volumes[row-1].Attachments
-	if len(attachments) == 0 { // Clear table
+	// if len(attachments) == 0 { // Clear table
 		tableEditVolume.Clear()
 		drawFirstRowTable(tableEditVolume)
-		return
-	}
+	// 	return
+	// }
 	for rowIdx, info := range attachments {
 		items := []interface{}{info.InstanceId, info.State, info.Device, info.AttachTime}
 		for colIdx, item := range items {
@@ -828,11 +834,11 @@ func fillVolumesTable(ec2svc *ec2Service) {
 	if ec2svc.volumes, err = ec2svc.Model.ListVolumes(); err != nil {
 		ec2svc.showConfirmationBox(err.Error(), true, nil)
 	}
-	if len(ec2svc.volumes) == 0 { // Clear table
+	// if len(ec2svc.volumes) == 0 { // Clear table
 		volumesTable.Clear()
 		drawFirstRowTable(volumesTable)
-		return
-	}
+	// 	return
+	// }
 	for rowIdx, volume := range ec2svc.volumes {
 		items := []interface{}{volume.VolumeId, volume.Size, volume.VolumeType, volume.Iops, volume.State}
 		for colIdx, item := range items {
@@ -850,11 +856,11 @@ func fillInstancesTable(ec2svc *ec2Service) {
 	if ec2svc.instances, err = ec2svc.Model.GetEC2Instances(); err != nil { // directly invokes a method on the model
 		ec2svc.showConfirmationBox(err.Error(), true, nil)
 	}
-	if len(ec2svc.instances) == 0 { // Clear table
+	// if len(ec2svc.instances) == 0 { // Clear table
 		instancesTable.Clear()
 		drawFirstRowTable(instancesTable)
-		return
-	}
+	// 	return
+	// }
 	for rowIdx, instance := range ec2svc.instances {
 		items := []interface{}{instance.InstanceId, instance.ImageId, instance.InstanceType, instance.State.Name}
 		for colIdx, item := range items {
