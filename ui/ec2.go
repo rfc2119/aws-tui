@@ -5,8 +5,8 @@ import (
 	"log"
 	"rfc2119/aws-tui/common"
 	"rfc2119/aws-tui/model"
+	"strconv"
 	"strings"
-    "strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -99,8 +99,6 @@ var (
 	}) // Component in "Edit volumes"
 	tableEditVolume        = NewEtable()
 	EBSVolumesStateMachine = common.NewEBSVolumeStateMachine()
-
-
 )
 
 type ec2Service struct {
@@ -173,11 +171,9 @@ func (ec2svc *ec2Service) InitView() {
 	inputFieldVolumeIops.SetLabel("IOPS").SetFieldWidth(5)
 	inputFieldVolumeSize.SetLabel("Size (GiB)").SetFieldWidth(5)
 	dropDownVolumeType.SetLabel("Type")
-	// dropDownVolumeType.SetOptions([]string{"Magnetic (standard)", "General Purpose SSD (gp2)", "Provisioned IOPS SSD (io1)", "Provisioned IOPS SSD (io2)"}, nil)
 	dropDownVolumeType.SetOptions(
-        []string{"standard", "io1", "io2", "gp2", "sc1", "st1"},
-        nil)
-	gridEditVolume.SetBorders(true).SetTitle("Test") // Not working :(
+		[]string{"standard", "io1", "io2", "gp2", "sc1", "st1"}, nil)
+	gridEditVolume.SetBorders(true).SetBorder(true).SetTitle("Test").SetTitleAlign(tview.AlignCenter)
 
 	tableEditVolume.SetBorders(false)
 	tableEditVolume.SetSelectable(true, false)
@@ -198,7 +194,7 @@ func (ec2svc *ec2Service) InitView() {
 	ec2svc.RootPage.EAddPage("Volumes", volumesFlex, true, false)     // TODO: page names and such; resize=true, visible=false
 
 	ec2svc.WatchChanges()
-    ec2svc.setDropDownsCallbacks()
+	ec2svc.setDropDownsCallbacks()
 
 }
 
@@ -335,6 +331,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 
 	volumesTableCallBacks := map[tcell.Key]func(){
 		tcell.Key('r'): func() { fillVolumesTable(ec2svc) },
+		tcell.Key('c'): func() { createVolume(ec2svc) },
 		tcell.Key('e'): func() {
 			// Configuring the state radio button
 			row, _ := volumesTable.GetSelection()
@@ -344,14 +341,16 @@ func (ec2svc *ec2Service) setCallbacks() {
 				return
 			}
 			configureRadioButton(radioButtonVolumeStatus, EBSVolumesStateMachine)
-            if iops := volumesTable.GetCell(row, COL_EBS_IOPS).Text; iops != "0" {
-                inputFieldVolumeIops.SetFieldWidth(5)
-                inputFieldVolumeIops.SetText(iops)
-            } else { inputFieldVolumeIops.SetFieldWidth(-1) }   // No IOPS for magnetic HDDs
+			if iops := volumesTable.GetCell(row, COL_EBS_IOPS).Text; iops != "0" {
+				inputFieldVolumeIops.SetFieldWidth(5)
+				inputFieldVolumeIops.SetText(iops)
+			} else {
+				inputFieldVolumeIops.SetFieldWidth(-1)
+			} // No IOPS for magnetic HDDs
 			inputFieldVolumeSize.SetText(volumesTable.GetCell(row, COL_EBS_SIZE).Text)
 			// dropDownVolumeType.SetIndex()       // TODO
 			fillTableEditVolume(ec2svc)
-			ec2svc.showGenericModal(gridEditVolume, 50, 20, true)
+			ec2svc.showGenericModal(gridEditVolume, 50, 30, true)
 		},
 	}
 	volumesTable.UpdateKeyToFunc(volumesTableCallBacks)
@@ -437,63 +436,63 @@ func (ec2svc *ec2Service) setCallbacks() {
 		}
 		configureRadioButton(radioButtonVolumeStatus, EBSVolumesStateMachine)
 	})
-    inputFieldVolumeIops.SetDoneFunc(func(key tcell.Key){
-        if key == tcell.KeyEnter {
-        row, _ := volumesTable.GetSelection()
-        oldIops := volumesTable.GetCell(row, COL_EBS_IOPS).Text
-        newIops := inputFieldVolumeIops.GetText()
-        if oldIops != newIops {     // TODO: should new IOPS be > old IOPS ?
-            var (
-                iops int64
-                err error
-            )
-            msg := fmt.Sprintf("Change volume IOPS from %s to %s ?", oldIops, newIops)
-            volId := volumesTable.GetCell(row, COL_EBS_ID).Text
-            if iops, err = strconv.ParseInt(newIops, 10, 64); err != nil {
-                log.Println("numerical conversion error")
-                return
-            }
-            ec2svc.showConfirmationBox(msg, true, func(){
-                if _, err := ec2svc.Model.ModifyVolume(iops, -1, "", volId); err != nil { // alert
-                    ec2svc.showConfirmationBox(err.Error(), true, nil)
-                    return
-                }
-                ec2svc.StatusBar.SetText("changing volume IOPS to " + newIops)
-            })
-        }
-    }
-    })
+	inputFieldVolumeIops.SetDoneFunc(func(key tcell.Key) {
+		if key == tcell.KeyEnter {
+			row, _ := volumesTable.GetSelection()
+			oldIops := volumesTable.GetCell(row, COL_EBS_IOPS).Text
+			newIops := inputFieldVolumeIops.GetText()
+			if oldIops != newIops { // TODO: should new IOPS be > old IOPS ?
+				var (
+					iops int64
+					err  error
+				)
+				msg := fmt.Sprintf("Change volume IOPS from %s to %s ?", oldIops, newIops)
+				volId := volumesTable.GetCell(row, COL_EBS_ID).Text
+				if iops, err = strconv.ParseInt(newIops, 10, 64); err != nil {
+					log.Println("numerical conversion error")
+					return
+				}
+				ec2svc.showConfirmationBox(msg, true, func() {
+					if _, err := ec2svc.Model.ModifyVolume(iops, -1, "", volId); err != nil { // alert
+						ec2svc.showConfirmationBox(err.Error(), true, nil)
+						return
+					}
+					ec2svc.StatusBar.SetText("changing volume IOPS to " + newIops)
+				})
+			}
+		}
+	})
 }
 
 // SetOptions(..., nil) gets called after initializing callbacks for UI elements
-func (ec2svc *ec2Service) setDropDownsCallbacks(){
+func (ec2svc *ec2Service) setDropDownsCallbacks() {
 
-    dropDownVolumeType.SetSelectedFunc(func(newType string, index int){
-        row, _ := volumesTable.GetSelection()
-        oldType := volumesTable.GetCell(row, COL_EBS_TYPE).Text
-        if oldType != newType {
-            var (
-                iops int64 = -1
-                err error
-            )
-            msg := fmt.Sprintf("Change volume type from %s to %s ?", oldType, newType)
-            volId := volumesTable.GetCell(row, COL_EBS_ID).Text
-            if newType == "io1" || newType == "io2" {
-                msg = msg + "\nNote: Please specify the required IOPS in the IOPS field "
-                if iops, err = strconv.ParseInt(inputFieldVolumeIops.GetText(), 10, 64); err != nil {
-                    log.Println("numerical conversion error")
-                }
-            }
-            ec2svc.showConfirmationBox(msg, true, func(){
-                if _, err := ec2svc.Model.ModifyVolume(iops, -1, newType, volId); err != nil { // alert
-                    ec2svc.showConfirmationBox(err.Error(), true, nil)
-                    return
-                }
-                ec2svc.StatusBar.SetText("changing volume type to " + newType)
-            })
-        }
-    })
-	instanceOfferingsDropdown.SetSelectedFunc(nil)      // TODO
+	dropDownVolumeType.SetSelectedFunc(func(newType string, index int) {
+		row, _ := volumesTable.GetSelection()
+		oldType := volumesTable.GetCell(row, COL_EBS_TYPE).Text
+		if oldType != newType {
+			var (
+				iops int64 = -1
+				err  error
+			)
+			msg := fmt.Sprintf("Change volume type from %s to %s ?", oldType, newType)
+			volId := volumesTable.GetCell(row, COL_EBS_ID).Text
+			if newType == "io1" || newType == "io2" {
+				msg = msg + "\nNote: Please specify the required IOPS in the IOPS field "
+				if iops, err = strconv.ParseInt(inputFieldVolumeIops.GetText(), 10, 64); err != nil {
+					log.Println("numerical conversion error")
+				}
+			}
+			ec2svc.showConfirmationBox(msg, true, func() {
+				if _, err := ec2svc.Model.ModifyVolume(iops, -1, newType, volId); err != nil { // alert
+					ec2svc.showConfirmationBox(err.Error(), true, nil)
+					return
+				}
+				ec2svc.StatusBar.SetText("changing volume type to " + newType)
+			})
+		}
+	})
+	instanceOfferingsDropdown.SetSelectedFunc(nil) // TODO
 }
 
 // TODO: could this be a generic filter box ?
@@ -573,19 +572,103 @@ func (ec2svc *ec2Service) chooseAMIFilters() {
 	ec2svc.showGenericModal(form, 80, 10, true) // 80x10 seems good for my screen
 }
 
+// Pops up a form (similar to the official web UI) to create a new EBS volume
+func createVolume(ec2svc *ec2Service) {
+	form := tview.NewForm()
+	inputFieldVolumeIops := tview.NewInputField().SetLabel("IOPS").SetFieldWidth(5)
+	inputFieldVolumeSize := tview.NewInputField().SetLabel("Size (GiB)").SetFieldWidth(5)
+	inputFieldSnapshotId := tview.NewInputField().SetLabel("Snapshot ID").SetFieldWidth(19)
+	dropDownVolumeType := tview.NewDropDown().SetLabel("Type")
+	dropDownAvailabilityZone := tview.NewDropDown().SetLabel("Availablity Zone")
+	checkBoxEncryptVolume := tview.NewCheckbox().SetLabel("Encrypt")
+	checkBoxMultiAttach := tview.NewCheckbox().SetLabel("Multi Attach")
+	// tableTags := tview.NewTable()
+	dropDownVolumeType.SetOptions([]string{"standard", "io1", "io2", "gp2", "sc1", "st1"}, func(txt string, idx int) {
+		idxIops := form.GetFormItemIndex("IOPS")
+		idxMultiAttach := form.GetFormItemIndex("Multi Attach")
+		iopsExist := idxIops != -1
+		multiAttachExist := idxMultiAttach != -1
+		switch txt {
+		case "io1":
+			if !iopsExist {
+				form.AddFormItem(inputFieldVolumeIops)
+			}
+			if !multiAttachExist {
+				form.AddFormItem(checkBoxMultiAttach)
+			}
+		case "io2":
+			if !iopsExist {
+				form.AddFormItem(inputFieldVolumeIops)
+			}
+			if multiAttachExist {
+				form.RemoveFormItem(idxMultiAttach)
+			}
+		// 	case "sc1", "st1":
+		// 			form.AddFormItem(labelThroughput)	// TODO:
+		default:
+			if iopsExist {
+				form.RemoveFormItem(idxIops)
+			}
+			idxMultiAttach := form.GetFormItemIndex("Multi Attach") // re-evaluate index
+			if idxMultiAttach != -1 {
+				form.RemoveFormItem(idxMultiAttach)
+			}
+		}
+	})
+	buttonCreateFunc := func() {
+		var (
+			iops, size int64 = -1, -1
+			err        error
+		)
+		if iopsItem := form.GetFormItemByLabel("IOPS"); iopsItem != nil {
+			if iops, err = strconv.ParseInt(iopsItem.(*tview.InputField).GetText(), 10, 64); err != nil {
+				log.Println("numerical conversion error")
+				return
+			}
+		}
+		if size, err = strconv.ParseInt(inputFieldVolumeSize.GetText(), 10, 64); err != nil {
+			log.Println("numerical conversion error")
+			return
+		}
+		_, az := dropDownAvailabilityZone.GetCurrentOption()
+		_, volType := dropDownVolumeType.GetCurrentOption()
+		snapshotId := inputFieldSnapshotId.GetText()
+		isEncrypted := checkBoxEncryptVolume.IsChecked()
+		isMultiAttached := checkBoxMultiAttach.IsChecked()
+		if _, err = ec2svc.Model.CreateVolume(iops, size, volType, snapshotId, az, isEncrypted, isMultiAttached); err != nil {
+			ec2svc.showConfirmationBox(err.Error(), true, nil)
+			return
+		}
+		ec2svc.StatusBar.SetText("Creating EBS Volume")
+		ec2svc.RootPage.ESwitchToPreviousPage()
+	}
+	buttonCancelFunc := func() { ec2svc.RootPage.ESwitchToPreviousPage() }
+	dropDownAvailabilityZone.SetOptions([]string{"ap-northeast-2c"}, nil) // TODO:
+	dropDownVolumeType.SetCurrentOption(0)
+	dropDownAvailabilityZone.SetCurrentOption(0)
+
+	for _, item := range []tview.FormItem{dropDownVolumeType, inputFieldVolumeSize, dropDownAvailabilityZone, inputFieldSnapshotId, checkBoxEncryptVolume} {
+		form.AddFormItem(item)
+	}
+	form.AddButton("Create", buttonCreateFunc)
+	form.AddButton("Cancel", buttonCancelFunc)
+	form.SetTitle("Create a new EBS Volume").SetBorder(true)
+	ec2svc.showGenericModal(form, 40, 20, true) // 40x20 seems good for my screen
+}
+
 // Dispatches goroutines to monitor changes. Assigns listeners to each action
 func (svc *ec2Service) WatchChanges() {
 	svc.Model.DispatchWatchers()
 	go func(ch <-chan common.Action) { // listener goroutine
-		for action := range ch {       // poll channel for eternity
+		for action := range ch { // poll channel for eternity
 			// switch action.Data.(type){
 			switch action.Type {
 			case common.ACTION_INSTANCES_STATUS_UPDATE:
 				go listener1(action)
-            case common.ACTION_VOLUME_MODIFIED:
-                go listener2(action)
-            case common.ACTION_ERROR:
-                // TODO
+			case common.ACTION_VOLUME_MODIFIED:
+				go listener2(action)
+			case common.ACTION_ERROR:
+				// TODO
 			default:
 				log.Printf("received invalid data of type %T", action.Data)
 			}
@@ -596,18 +679,18 @@ func (svc *ec2Service) WatchChanges() {
 
 // listener for watcher1
 func listener1(action common.Action) {
-    var (
-        rowIdx int
-        indicesColoredRows []int
-    )
+	var (
+		rowIdx             int
+		indicesColoredRows []int
+	)
 	statuses := action.Data.([]ec2.InstanceStatus)
 	for _, status := range statuses {
 		if rowIdx = rowIndexFromTable(instancesTable, *status.InstanceId); rowIdx == -1 {
-            continue
-        }
+			continue
+		}
 		cell := instancesTable.GetCell(rowIdx, COL_EC2_STATE)
 		newState := stringFromAWSVar(status.InstanceState.Name)
-		if newState != cell.Text {      // State has been changed
+		if newState != cell.Text { // State has been changed (TODO: should i change ec2svc.instances ?)
 			// Hop to state newState and trigger the onEnter function (to get the correct color)
 			state := ssm.State{Name: newState}
 			if err := EC2InstancesStateMachine.GoToState(state, true); err != nil {
@@ -616,19 +699,40 @@ func listener1(action common.Action) {
 			}
 			colorizeRowInTable(instancesTable, rowIdx, EC2InstancesStateMachine.GetColor())
 			cell.SetText(newState) // TODO: queue draw event
-            indicesColoredRows = append(indicesColoredRows, rowIdx)
+			indicesColoredRows = append(indicesColoredRows, rowIdx)
 		}
 	}
-    go func(indices []int) {            // TODO: this is a cheap way of clearing colors
-        time.Sleep(3 * time.Second) // TODO
-        for i := 0; i < len(indices); i++ {
-            colorizeRowInTable(instancesTable, indices[i], tcell.ColorDefault)
-        }
-    }(indicesColoredRows)
+	go func(indices []int) { // TODO: this is a cheap way of clearing colors
+		time.Sleep(3 * time.Second) // TODO
+		for i := 0; i < len(indices); i++ {
+			colorizeRowInTable(instancesTable, indices[i], tcell.ColorDefault)
+		}
+	}(indicesColoredRows)
 }
 
 func listener2(action common.Action) {
-    // TODO
+	var rowIdx int
+	modifications := action.Data.([]ec2.VolumeModification)
+	for _, mod := range modifications {
+		if rowIdx = rowIndexFromTable(volumesTable, aws.StringValue(mod.VolumeId)); rowIdx == -1 {
+			continue
+		}
+		iopsCell := volumesTable.GetCell(rowIdx, COL_EBS_IOPS)
+		sizeCell := volumesTable.GetCell(rowIdx, COL_EBS_SIZE)
+		volTypeCell := volumesTable.GetCell(rowIdx, COL_EBS_TYPE)
+		log.Printf("%v", mod)
+		if iopsCell.Text != stringFromAWSVar(mod.TargetIops) ||
+			sizeCell.Text != stringFromAWSVar(mod.TargetSize) ||
+			volTypeCell.Text != stringFromAWSVar(mod.TargetVolumeType) {
+			log.Print("HALP")
+			if stringFromAWSVar(mod.Progress) == "100" { // TODO: that's it ?
+				iopsCell.SetText(stringFromAWSVar(mod.TargetIops))
+				sizeCell.SetText(stringFromAWSVar(mod.TargetSize))
+				volTypeCell.SetText(stringFromAWSVar(mod.TargetVolumeType))
+			}
+		}
+		// TODO: colour rows maybe ?
+	}
 }
 
 // ============ helper functions

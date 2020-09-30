@@ -172,7 +172,7 @@ func (mdl *EC2Model) ModifyVolume(iops, size int64, volType, volId string) (ec2.
     if iops != -1 { input.Iops = aws.Int64(iops) }
     if size != -1 { input.Size = aws.Int64(size) }
     if volType != "" { input.VolumeType = ec2.VolumeType(volType) }
-    input.VolumeId = aws.String(volId)
+    input.VolumeId = aws.String(volId)		// Required
 
     req := mdl.model.ModifyVolumeRequest(input)
 	resp, err := req.Send(context.TODO())
@@ -180,6 +180,25 @@ func (mdl *EC2Model) ModifyVolume(iops, size int64, volType, volId string) (ec2.
         return ec2.ModifyVolumeOutput{}, err
     }
     return *resp.ModifyVolumeOutput, nil
+}
+func (mdl *EC2Model) CreateVolume(iops, size int64, volType,  snapshotId, az string, isEncrypted, isMultiAttached bool) (ec2.CreateVolumeOutput, error) {
+	// TODO: tags 
+    input := &ec2.CreateVolumeInput{}
+    if iops != -1 { input.Iops = aws.Int64(iops) }
+    if size != -1 { input.Size = aws.Int64(size) }
+    if volType != "" { input.VolumeType = ec2.VolumeType(volType) }
+    if snapshotId != "" { input.SnapshotId = aws.String(snapshotId) }
+    input.MultiAttachEnabled = aws.Bool(isMultiAttached)
+    input.Encrypted = aws.Bool(isEncrypted)
+    input.AvailabilityZone = aws.String(az)		// Required
+
+    req := mdl.model.CreateVolumeRequest(input)
+	resp, err := req.Send(context.TODO())
+    if err != nil {
+        return ec2.CreateVolumeOutput{}, err
+    }
+    return *resp.CreateVolumeOutput, nil
+
 }
 // TODO: I don't understand yet why this is better than a simple print
 func  printAWSError(err error) error {
@@ -233,7 +252,6 @@ func watcher1(client *ec2.Client, ch chan<- common.Action, describeAll bool) {
 	ch <- action
 }
 func watcher2(client *ec2.Client, ch chan<- common.Action) {        // TODO: filters ?
-
     var modifications []ec2.VolumeModification
     req := client.DescribeVolumesModificationsRequest(&ec2.DescribeVolumesModificationsInput{})
     paginator := ec2.NewDescribeVolumesModificationsPaginator(req)

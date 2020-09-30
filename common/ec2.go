@@ -35,7 +35,7 @@ var (
 
 func NewEBSVolumeStateMachine() *EStateMachine {
 	// State machine for the life cycle of an EBS Volume
-    // Reference: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-describing-volumes.html#volume-state
+	// Reference: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-describing-volumes.html#volume-state
 	// Triggers (see ui/ec2 for trigger names)  TODO: unify trigger names
 	emptyTrigger := ssm.Trigger{Key: " "} // transition to intermediate states
 	attachTrigger := ssm.Trigger{Key: "Attach"}
