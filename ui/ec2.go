@@ -14,6 +14,7 @@ import (
 	"github.com/gdamore/tcell"
 	"github.com/rfc2119/simple-state-machine"
 	"github.com/rivo/tview"
+	// "golang.org/x/crypto/ssh"
 )
 
 // TODO: *pukes*
@@ -32,9 +33,11 @@ const (
 	COL_EBS_TYPE
 	COL_EBS_IOPS
 	COL_EBS_STATE
+	COL_EBS_MODIFICATION_STATE
 )
 
 const (
+	// detaching ebs volumes from ec2 instances
 	COL_EBS_VOL_INSTANCE_ID = iota
 	COL_EBS_VOL_STATE
 	COL_EBS_VOL_DEVICE_NAME
@@ -49,27 +52,34 @@ const (
 	`
 	HELP_EBS_MAIN = `
     r               Refresh list of volumes
-	e               Edit volume (WIP)
+	e               Edit volume
+	c		Create a new volume
 	`
 	HELP_EBS_EDIT_VOL = `
 # Attach/Detach to/from EC2 instances
-You can attach instances only available in the same AZ as the volume. You can create io1 volumes can be attached to multiple instances (see https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-volumes-multi.html).
+You can attach instances only available in the same AZ as the volume. You can create io1 volumes can be attached to multiple instances (see [ebs-volumes-multi](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-volumes-multi.html)).
 
 If your volume state becomes *detaching*, it is likely that you need the "Force Detach" option. As per the documentation:
     > Use this option only as a last resort to detach a volume from a failed instance, or if you are detaching a volume with the intention of deleting it. The instance doesn't get an opportunity to flush file system caches or file system metadata. If you use this option, you must perform the file system check and repair procedures
     
-# Device names
+## Device names
 On linux Devices, names /dev/sd{f-p} are valid "mount points". The kernel may rename these internally to something like /dev/xvd{f-p}. For HVM instances, /dev/sda1 or /dev/xvda is reserved for root devices. See https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html for a complete list of valid names and considerations
 
-# Type, size and IOPS
-Available types are abbreviated as the following. Not all volumes can have its type changed.Setting IOPS is only available for io{1,2} types
+# Changing type, size or IOPS
+Available types are abbreviated as the following. Not all volumes can have its type changed. Setting IOPS is only available for io{1,2} types. Please see [here](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-volume-types.html#ebs-volume-characteristics) for a comprehensive description
 
     General Purpose SSD (gp2)
     Provisioned IOPS SSD    (io2 and io1)
     Throughput Optimized HDD (st1)
     Cold HDD (sc1)
 
-Please see https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-volume-types.html#ebs-volume-characteristics for a comprehensive description
+As per the [documentation](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/monitoring-volume-modifications.html), Volume modification changes take effect as follows:
+
+* Size changes usually take a few seconds to complete and take effect after a volume is in the Optimizing state.
+* Performance (IOPS) changes can take from a few minutes to a few hours to complete and are dependent on the configuration change being made.
+* It might take up to 24 hours for a new configuration to take effect, and in some cases more, such as when the volume has not been fully initialized. Typically, a fully used 1-TiB volume takes about 6 hours to migrate to a new performance configuration.
+
+[::b]Here, once the modification state reaches "completed", the values in the interface will be updated
 `
 )
 
@@ -97,8 +107,9 @@ var (
 	radioButtonVolumeStatus = NewRadioButtons([]string{
 		"Attach", "Detach", "Force Detach", "Delete",
 	}) // Component in "Edit volumes"
-	tableEditVolume        = NewEtable()
-	EBSVolumesStateMachine = common.NewEBSVolumeStateMachine()
+	tableEditVolume                   = NewEtable()
+	EBSVolumesStateMachine            = common.NewEBSVolumeStateMachine()
+	EBSVolumeModificationStateMachine = common.NewEBSVolumeModificationStateMachine()
 )
 
 type ec2Service struct {
@@ -170,6 +181,8 @@ func (ec2svc *ec2Service) InitView() {
 
 	inputFieldVolumeIops.SetLabel("IOPS").SetFieldWidth(5)
 	inputFieldVolumeSize.SetLabel("Size (GiB)").SetFieldWidth(5)
+	inputFieldVolumeIops.SetAcceptanceFunc(tview.InputFieldInteger)
+	inputFieldVolumeSize.SetAcceptanceFunc(tview.InputFieldInteger)
 	dropDownVolumeType.SetLabel("Type")
 	dropDownVolumeType.SetOptions(
 		[]string{"standard", "io1", "io2", "gp2", "sc1", "st1"}, nil)
@@ -185,7 +198,7 @@ func (ec2svc *ec2Service) InitView() {
 	gridEditVolume.HelpMessage = HELP_EBS_EDIT_VOL
 	gridEditVolume.SetRows(2, 2, 2, 0)
 	gridEditVolume.SetColumns(10, 0, 20)
-	gridEditVolume.EAddItem(dropDownVolumeType, 0, 0, 1, 2, 0, 0, true) // row, col, rowSpan, colSpan, minGridHeight, minGridWidth, focus
+	gridEditVolume.EAddItem(dropDownVolumeType, 0, 0, 1, 2, 0, 0, false) // row, col, rowSpan, colSpan, minGridHeight, minGridWidth, focus
 	gridEditVolume.EAddItem(inputFieldVolumeSize, 1, 0, 1, 2, 0, 0, false)
 	gridEditVolume.EAddItem(inputFieldVolumeIops, 2, 0, 1, 2, 0, 0, false)
 	gridEditVolume.EAddItem(radioButtonVolumeStatus, 0, 2, 3, 1, 0, 0, false)
@@ -254,7 +267,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 
 	// instancesFlex container for EC2 instances table
 	instancesFlexCallBacks := map[tcell.Key]func(){
-		tcell.KeyCtrlL: func() { ec2svc.chooseAMIFilters() },
+		tcell.KeyCtrlL: func() { chooseAMIFilters(ec2svc) },
 	}
 	ec2svc.mainUI.enableShiftingFocus(instancesFlex.layoutContainer)
 	instancesFlex.UpdateKeyToFunc(instancesFlexCallBacks)
@@ -347,7 +360,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 				inputFieldVolumeIops.SetFieldWidth(5)
 				inputFieldVolumeIops.SetText(iops)
 			} else {
-				inputFieldVolumeIops.SetFieldWidth(-1)
+				inputFieldVolumeIops.SetFieldWidth(-1) // Awful hack to disable the input field
 			} // No IOPS for magnetic HDDs
 			inputFieldVolumeSize.SetText(volumesTable.GetCell(row, COL_EBS_SIZE).Text)
 			// dropDownVolumeType.SetIndex()       // TODO
@@ -361,7 +374,6 @@ func (ec2svc *ec2Service) setCallbacks() {
 			currOpt := radioButtonVolumeStatus.GetCurrentOptionName()
 			msg := fmt.Sprintf("%s volume ?", currOpt)
 			ec2svc.showConfirmationBox(msg, true, func() {
-				// ec2svc.StatusBar.SetText(fmt.Sprintf("%#v", test))
 				row, _ := tableEditVolume.GetSelection()
 				detachedInstanceId := tableEditVolume.GetCell(row, COL_EBS_VOL_INSTANCE_ID).Text
 				detachedDeviceName := tableEditVolume.GetCell(row, COL_EBS_VOL_DEVICE_NAME).Text
@@ -370,19 +382,21 @@ func (ec2svc *ec2Service) setCallbacks() {
 				az := aws.StringValue(ec2svc.volumes[row-1].AvailabilityZone)
 				switch currOpt {
 				case "Attach":
-					// ec2svc.showConfirmationBox("TODO!", true, nil)
 					form := tview.NewForm()
 					inputFieldInstanceId := tview.NewInputField().SetLabel("Instance ID")
 					inputFieldDeviceName := tview.NewInputField().SetLabel("Device Name")
-					inputFieldInstanceId.SetFieldWidth(19) // TODO: acceptance func
+					inputFieldInstanceId.SetFieldWidth(19)
 					inputFieldDeviceName.SetFieldWidth(10)
+					inputFieldInstanceId.SetAcceptanceFunc(tview.InputFieldMaxLength(inputFieldInstanceId.GetFieldWidth()))
+					inputFieldDeviceName.SetAcceptanceFunc(tview.InputFieldMaxLength(inputFieldDeviceName.GetFieldWidth()))
 					buttonCancelFunc := func() { ec2svc.RootPage.ESwitchToPreviousPage() }
 					buttonAttachFunc := func() {
 						if _, err := ec2svc.Model.AttachVolume(volId, inputFieldInstanceId.GetText(), inputFieldDeviceName.GetText()); err != nil {
 							ec2svc.showConfirmationBox(err.Error(), true, nil)
-						} else {
-							buttonCancelFunc()
+							return
 						}
+						ec2svc.StatusBar.SetText(fmt.Sprintf("Attaching volume %s to instance %s. Hit refresh", volId, inputFieldInstanceId.GetText()))
+						buttonCancelFunc()
 					}
 					// Set auto complete for the current selected text. copied from demos/inputfield
 					inputFieldInstanceId.SetAutocompleteFunc(func(currentText string) (entries []string) {
@@ -405,21 +419,26 @@ func (ec2svc *ec2Service) setCallbacks() {
 					form.AddFormItem(inputFieldDeviceName)
 					form.SetTitle(fmt.Sprintf("%s in %s", volId, az))
 					form.SetBorder(true)
-					ec2svc.showGenericModal(form, 50, 15, false)
+					ec2svc.showGenericModal(form, 50, 10, false)
 				case "Force Detach":
 					if _, err := ec2svc.Model.DetachVolume(volId, detachedInstanceId, detachedDeviceName, false); err != nil {
 						ec2svc.showConfirmationBox(err.Error(), true, nil)
 					}
+					ec2svc.StatusBar.SetText(fmt.Sprintf("Force detaching volume %s from instance %s mounted on %s. Hit refresh", volId, detachedInstanceId, detachedDeviceName))
+					ec2svc.RootPage.ESwitchToPreviousPage()
 				case "Detach":
 					if _, err := ec2svc.Model.DetachVolume(volId, detachedInstanceId, detachedDeviceName, false); err != nil {
 						ec2svc.showConfirmationBox(err.Error(), true, nil)
 					}
+					ec2svc.StatusBar.SetText(fmt.Sprintf("Detaching volume %s from instance %s mounted on %s. Hit refresh", volId, detachedInstanceId, detachedDeviceName))
+					ec2svc.RootPage.ESwitchToPreviousPage()
 				case "Delete": // TODO
 					if _, err := ec2svc.Model.DeleteVolume(volId); err != nil {
 						ec2svc.showConfirmationBox(err.Error(), true, nil)
 						return
 					}
-					ec2svc.StatusBar.SetText("Deleting volume " + volId)
+					ec2svc.StatusBar.SetText(fmt.Sprintf("Deleting volume %s. Hit refresh to list volumes. Hit refresh", volId))
+					ec2svc.RootPage.ESwitchToPreviousPage()
 				}
 			})
 
@@ -455,7 +474,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 				msg := fmt.Sprintf("Change volume IOPS from %s to %s ?", oldIops, newIops)
 				volId := volumesTable.GetCell(row, COL_EBS_ID).Text
 				if iops, err = strconv.ParseInt(newIops, 10, 64); err != nil {
-					log.Println("numerical conversion error")
+					ec2svc.StatusBar.SetText("numerical conversion error") // TODO: logging
 					return
 				}
 				ec2svc.showConfirmationBox(msg, true, func() {
@@ -468,9 +487,37 @@ func (ec2svc *ec2Service) setCallbacks() {
 			}
 		}
 	})
+	inputFieldVolumeSize.SetDoneFunc(func(key tcell.Key) {
+		if key == tcell.KeyEnter {
+			var (
+				oldSize, newSize int64
+				err              error
+			)
+			row, _ := volumesTable.GetSelection()
+			if oldSize, err = strconv.ParseInt(volumesTable.GetCell(row, COL_EBS_SIZE).Text, 10, 64); err != nil {
+				log.Println("numerical conversion error")
+				return
+			}
+			if newSize, err = strconv.ParseInt(inputFieldVolumeSize.GetText(), 10, 64); err != nil {
+				log.Println("numerical conversion error")
+				return
+			}
+			if newSize > oldSize {
+				msg := fmt.Sprintf("Change volume size from %d to %d ?", oldSize, newSize)
+				volId := volumesTable.GetCell(row, COL_EBS_ID).Text
+				ec2svc.showConfirmationBox(msg, true, func() {
+					if _, err := ec2svc.Model.ModifyVolume(-1, newSize, "", volId); err != nil {
+						ec2svc.showConfirmationBox(err.Error(), true, nil)
+						return
+					}
+					ec2svc.StatusBar.SetText(fmt.Sprintf("changing volume size to %d", newSize))
+				})
+			}
+		}
+	})
 }
 
-// SetOptions(..., nil) gets called after initializing callbacks for UI elements
+// Because SetOptions(..., nil) gets called after initializing callbacks for UI elements
 func (ec2svc *ec2Service) setDropDownsCallbacks() {
 
 	dropDownVolumeType.SetSelectedFunc(func(newType string, index int) {
@@ -484,7 +531,7 @@ func (ec2svc *ec2Service) setDropDownsCallbacks() {
 			msg := fmt.Sprintf("Change volume type from %s to %s ?", oldType, newType)
 			volId := volumesTable.GetCell(row, COL_EBS_ID).Text
 			if newType == "io1" || newType == "io2" {
-				msg = msg + "\nNote: Please specify the required IOPS in the IOPS field "
+				msg = msg + "\nNote: Please specify the required IOPS in the IOPS field " // TODO: calculate IOPS and impose it
 				if iops, err = strconv.ParseInt(inputFieldVolumeIops.GetText(), 10, 64); err != nil {
 					log.Println("numerical conversion error")
 				}
@@ -494,16 +541,271 @@ func (ec2svc *ec2Service) setDropDownsCallbacks() {
 					ec2svc.showConfirmationBox(err.Error(), true, nil)
 					return
 				}
-				ec2svc.StatusBar.SetText("changing volume type to " + newType)
+				ec2svc.StatusBar.SetText("Changing volume type to " + newType)
 			})
 		}
 	})
 	instanceOfferingsDropdown.SetSelectedFunc(nil) // TODO
 }
 
+// Dispatches goroutines to monitor changes. Assigns listeners to each action
+func (svc *ec2Service) WatchChanges() {
+	svc.Model.DispatchWatchers()
+	go func(ch <-chan common.Action) { // listener goroutine
+		for action := range ch { // poll channel for eternity
+			// switch action.Data.(type){
+			switch action.Type {
+			case common.ACTION_INSTANCES_STATUS_UPDATE:
+				go listener1(action)
+			case common.ACTION_VOLUME_MODIFIED:
+				go listener2(action)
+			case common.ACTION_ERROR:
+				// TODO
+			default:
+				log.Printf("received invalid data of type %T", action.Data)
+			}
+		}
+	}(svc.Model.Channel)
+
+}
+
+// TODO: description
+// TODO: return proper errors
+func hopToStateAndColorizeRowInTable(table *eTable, row, col int, newStateText string, sm *common.EStateMachine) int {
+	cell := table.GetCell(row, col)
+	if newStateText != cell.Text { // State has been changed (TODO: should i change ec2svc.instances ?)
+		// Hop to state newState and trigger the onEnter function (to get the correct color)
+		state := ssm.State{Name: newStateText}
+		if err := sm.GoToState(state, true); err != nil {
+			log.Println(err)
+			return -1
+		}
+		colorizeRowInTable(table, row, sm.GetColor())
+		cell.SetText(newStateText) // TODO: queue draw event
+		return row
+	}
+	return -1
+
+}
+
+// Listener for watcher1. Checks if an EC2 Instance status was changed and updates the UI
+func listener1(action common.Action) {
+	var (
+		rowIdx             int
+		indicesColoredRows []int
+	)
+	statuses := action.Data.([]ec2.InstanceStatus)
+	for _, status := range statuses {
+		if rowIdx = rowIndexFromTable(instancesTable, stringFromAWSVar(status.InstanceId)); rowIdx == -1 {
+			continue
+		}
+		newStateText := stringFromAWSVar(status.InstanceState.Name)
+		row := hopToStateAndColorizeRowInTable(instancesTable, rowIdx, COL_EC2_STATE, newStateText, EC2InstancesStateMachine)
+		if row != -1 {
+			indicesColoredRows = append(indicesColoredRows, row)
+		}
+	}
+	clearRowsColor(instancesTable, indicesColoredRows, 3)
+}
+
+// Listner for watcher2. Checks if a volume was recently modified and updates the UI
+func listener2(action common.Action) {
+	var (
+		rowIdx             int
+		indicesColoredRows []int
+	)
+	modifications := action.Data.([]ec2.VolumeModification)
+	for _, mod := range modifications {
+		if rowIdx = rowIndexFromTable(volumesTable, aws.StringValue(mod.VolumeId)); rowIdx == -1 {
+			continue
+		}
+		iopsCell := volumesTable.GetCell(rowIdx, COL_EBS_IOPS)
+		sizeCell := volumesTable.GetCell(rowIdx, COL_EBS_SIZE)
+		volTypeCell := volumesTable.GetCell(rowIdx, COL_EBS_TYPE)
+		if iopsCell.Text != stringFromAWSVar(mod.TargetIops) ||
+			sizeCell.Text != stringFromAWSVar(mod.TargetSize) ||
+			volTypeCell.Text != stringFromAWSVar(mod.TargetVolumeType) {
+			// log.Printf("Progress: %s", stringFromAWSVar(mod.Progress))
+			if stringFromAWSVar(mod.Progress) == "100" { // TODO: that's it ?
+				iopsCell.SetText(stringFromAWSVar(mod.TargetIops))
+				sizeCell.SetText(stringFromAWSVar(mod.TargetSize))
+				volTypeCell.SetText(stringFromAWSVar(mod.TargetVolumeType))
+			}
+		}
+		newStateText := stringFromAWSVar(mod.ModificationState)
+		row := hopToStateAndColorizeRowInTable(volumesTable, rowIdx, COL_EBS_MODIFICATION_STATE, newStateText, EBSVolumeModificationStateMachine)
+		if row != -1 {
+			indicesColoredRows = append(indicesColoredRows, row)
+		}
+	}
+	clearRowsColor(volumesTable, indicesColoredRows, 3)
+}
+
+// ============ helper functions
+// Given an instance ID, return the row index of the instance in instancesTable t
+func rowIndexFromTable(t *eTable, instanceID string) int {
+	idx := -1
+	for rowIdx := 1; rowIdx < t.GetRowCount(); rowIdx++ { // 1 because first row is for column labels
+		id := t.GetCell(rowIdx, COL_EC2_ID).Text // TODO: COL_EC2_ID
+		if instanceID == id {
+			idx = rowIdx
+			break
+		}
+	}
+	return idx
+}
+
+// Colorize a row in a given instancesTable
+func colorizeRowInTable(t *eTable, row int, color tcell.Color) {
+	for col := 0; col < t.GetColumnCount(); col++ {
+		t.GetCell(row, col).SetBackgroundColor(color)
+	}
+}
+
+// Clear colors of rows after t seconds
+func clearRowsColor(table *eTable, indicesColoredRows []int, t int) {
+	go func(indices []int) { // TODO: this is a cheap way of clearing colors
+		time.Sleep(time.Duration(t) * time.Second) // TODO
+		for i := 0; i < len(indices); i++ {
+			colorizeRowInTable(table, indices[i], tcell.ColorDefault)
+		}
+	}(indicesColoredRows)
+}
+
+// Applying DFS to return all valid next triggers from state machine sm
+func getNextTriggersNoEmptyTriggers(sm *common.EStateMachine, emptyTriggerKey string) []ssm.Trigger {
+	var (
+		ret []ssm.Trigger
+		// nextStates = EC2InstancesStateMachine.GetNextStates()    // TODO: states differ from next triggers
+		nextTriggers = sm.GetNextTriggers()
+	)
+
+	for _, nextTrig := range nextTriggers {
+		// EC2InstancesStateMachine.GoToState(next, false)     // triggerOnEnter=false
+		if nextTrig.Key == emptyTriggerKey { // An intermediate state!
+			// if EC2InstancesStateMachine.CanFire(emptyTriggerKey){
+			sm.Fire(nextTrig.Key, nil) // Fire the empty trigger
+			ret = getNextTriggersNoEmptyTriggers(sm, emptyTriggerKey)
+		} else {
+			ret = append(ret, nextTrig) // TODO: No better way ?
+		}
+	}
+	return ret
+}
+
+// Configures a radio button (whose options are names of state actions) according to current state in a state machine sm
+func configureRadioButton(rButton *RadioButtons, sm *common.EStateMachine) {
+	// currState := ssm.State{Name: currStateText}
+	// EC2InstancesStateMachine.GoToState(currState, false)
+	var allowedActions []ssm.Trigger                  // Valid next actions/triggers will be returned here
+	if trig := sm.GetEmptyTrigger(); trig.Key != "" { // Empty trigger is defined. beware that "" is not a key
+		allowedActions = getNextTriggersNoEmptyTriggers(sm, trig.Key)
+	} else {
+		allowedActions = sm.GetNextTriggers()
+	}
+	for idx, optName := range rButton.GetOptions() { // TODO: urgh
+		enabled := false
+		for _, allowedAction := range allowedActions {
+			if allowedAction.Key == optName {
+				rButton.EnableOptionByIdx(idx)
+				enabled = true
+				break
+			}
+		}
+		if !enabled {
+			rButton.DisableOptionByIdx(idx)
+		}
+	}
+}
+
+// TODO: generalize table drawing
+// Fills the table attached instances to EBS volumes
+func fillTableEditVolume(ec2svc *ec2Service) {
+	row, _ := volumesTable.GetSelection()
+	attachments := ec2svc.volumes[row-1].Attachments
+	// if len(attachments) == 0 { // Clear table
+	tableEditVolume.Clear()
+	drawFirstRowTable(tableEditVolume)
+	// 	return
+	// }
+	for rowIdx, info := range attachments {
+		items := []interface{}{info.InstanceId, info.State, info.Device, info.AttachTime}
+		for colIdx, item := range items {
+			cell := tview.NewTableCell(stringFromAWSVar(item)).SetAlign(tview.AlignCenter)
+			tableEditVolume.SetCell(rowIdx+1, colIdx, cell)
+		}
+	}
+}
+
+// TODO: generalize table drawing
+// Fills the table for EBS volumes with volume data
+func fillVolumesTable(ec2svc *ec2Service) {
+	var err error
+	if ec2svc.volumes, err = ec2svc.Model.ListVolumes(); err != nil {
+		ec2svc.showConfirmationBox(err.Error(), true, nil)
+	}
+	// if len(ec2svc.volumes) == 0 { // Clear table
+	volumesTable.Clear()
+	drawFirstRowTable(volumesTable)
+	// 	return
+	// }
+	for rowIdx, volume := range ec2svc.volumes {
+		items := []interface{}{volume.VolumeId, volume.Size, volume.VolumeType, volume.Iops, volume.State, ""}
+		for colIdx, item := range items { // "" = 'modification state'
+			cell := tview.NewTableCell(stringFromAWSVar(item)).SetAlign(tview.AlignCenter)
+			volumesTable.SetCell(rowIdx+1, colIdx, cell)
+		}
+	}
+}
+
+// TODO: generalize table drawing
+// Fills the table for EC2 instances with instance data
+func fillInstancesTable(ec2svc *ec2Service) {
+	var err error
+
+	if ec2svc.instances, err = ec2svc.Model.GetEC2Instances(); err != nil { // directly invokes a method on the model
+		ec2svc.showConfirmationBox(err.Error(), true, nil)
+	}
+	// if len(ec2svc.instances) == 0 { // Clear table
+	instancesTable.Clear()
+	drawFirstRowTable(instancesTable)
+	// 	return
+	// }
+	for rowIdx, instance := range ec2svc.instances {
+		items := []interface{}{instance.InstanceId, instance.ImageId, instance.InstanceType, instance.State.Name}
+		for colIdx, item := range items {
+			cell := tview.NewTableCell(stringFromAWSVar(item)).SetAlign(tview.AlignCenter)
+			instancesTable.SetCell(rowIdx+1, colIdx, cell)
+		}
+	}
+}
+
+// Draws the first row for specific table, or all tables if no table was provided
+func drawFirstRowTable(t *eTable) { // Hardcoded all the way (TODO?)
+	tableToColNames := map[*eTable][]string{
+		tableEditVolume:   []string{"Instance ID", "State", "Device", "Date Attached"},
+		volumesTable:      []string{"ID", "Size (GiB)", "Type", "IOPS", "State", "Modification State"},
+		instancesTable:    []string{"ID", "AMI", "Type", "State"},
+		instancesTableAMI: []string{"ID", "State", "Arch", "Creation Date", "Name", "Owner ID"},
+	}
+	drawRowFunc := func(table *eTable, colNames []string) {
+		for firstColIdx := 0; firstColIdx < len(colNames); firstColIdx++ {
+			table.SetCell(0, firstColIdx,
+				tview.NewTableCell(colNames[firstColIdx]).SetAlign(tview.AlignCenter).SetSelectable(false).SetAttributes(tcell.AttrBold))
+		}
+	}
+	if colNames, ok := tableToColNames[t]; ok {
+		drawRowFunc(t, colNames)
+		return
+	}
+	for ta, co := range tableToColNames {
+		drawRowFunc(ta, co)
+	}
+}
+
 // TODO: could this be a generic filter box ?
 // Pops up a box to filter list of AMIs. Filters are defined in file *common/ec2*
-func (ec2svc *ec2Service) chooseAMIFilters() {
+func chooseAMIFilters(ec2svc *ec2Service) {
 	var (
 		filterNames []string // need it for the dropdown
 	)
@@ -559,7 +861,7 @@ func (ec2svc *ec2Service) chooseAMIFilters() {
 
 		// TODO: generalize table drawing
 		for rowIdx, ami := range amis {
-			// ownerCell := tview.NewTableCell(*ami.ImageOwnerAlias)    // TODO:
+			// ownerCell := tview.NewTableCell(*ami.ImageOwnerAlias)    // TODO: panics for images w/o alias
 			items := []interface{}{ami.ImageId, ami.State, ami.Architecture, ami.CreationDate, ami.Name, ami.OwnerId}
 			for colIdx, item := range items {
 				cell := tview.NewTableCell(stringFromAWSVar(item))
@@ -584,6 +886,10 @@ func createVolume(ec2svc *ec2Service) {
 	inputFieldVolumeIops := tview.NewInputField().SetLabel("IOPS").SetFieldWidth(5)
 	inputFieldVolumeSize := tview.NewInputField().SetLabel("Size (GiB)").SetFieldWidth(5)
 	inputFieldSnapshotId := tview.NewInputField().SetLabel("Snapshot ID").SetFieldWidth(19)
+	inputFieldVolumeIops.SetAcceptanceFunc(tview.InputFieldInteger)
+	inputFieldVolumeSize.SetAcceptanceFunc(tview.InputFieldInteger)
+	inputFieldSnapshotId.SetAcceptanceFunc(tview.InputFieldMaxLength(inputFieldSnapshotId.GetFieldWidth()))
+
 	dropDownVolumeType := tview.NewDropDown().SetLabel("Type")
 	dropDownAvailabilityZone := tview.NewDropDown().SetLabel("Availablity Zone")
 	checkBoxEncryptVolume := tview.NewCheckbox().SetLabel("Encrypt")
@@ -641,12 +947,13 @@ func createVolume(ec2svc *ec2Service) {
 		snapshotId := inputFieldSnapshotId.GetText()
 		isEncrypted := checkBoxEncryptVolume.IsChecked()
 		isMultiAttached := checkBoxMultiAttach.IsChecked()
-		if _, err = ec2svc.Model.CreateVolume(iops, size, volType, snapshotId, az, isEncrypted, isMultiAttached); err != nil {
-			ec2svc.showConfirmationBox(err.Error(), true, nil)
+		if newVolume, err := ec2svc.Model.CreateVolume(iops, size, volType, snapshotId, az, isEncrypted, isMultiAttached); err == nil {
+			ec2svc.StatusBar.SetText(fmt.Sprintf("Creating EBS Volume with ID %s. Refresh the list of volumes", stringFromAWSVar(newVolume.VolumeId)))
+			ec2svc.volumes = append(ec2svc.volumes, ec2.Volume(newVolume)) // TODO: do that as well in other methods
+			ec2svc.RootPage.ESwitchToPreviousPage()
 			return
 		}
-		ec2svc.StatusBar.SetText("Creating EBS Volume")
-		ec2svc.RootPage.ESwitchToPreviousPage()
+		ec2svc.showConfirmationBox(err.Error(), true, nil)
 	}
 	buttonCancelFunc := func() { ec2svc.RootPage.ESwitchToPreviousPage() }
 	dropDownAvailabilityZone.SetOptions([]string{"ap-northeast-2c"}, nil) // TODO:
@@ -660,235 +967,4 @@ func createVolume(ec2svc *ec2Service) {
 	form.AddButton("Cancel", buttonCancelFunc)
 	form.SetTitle("Create a new EBS Volume").SetBorder(true)
 	ec2svc.showGenericModal(form, 40, 20, true) // 40x20 seems good for my screen
-}
-
-// Dispatches goroutines to monitor changes. Assigns listeners to each action
-func (svc *ec2Service) WatchChanges() {
-	svc.Model.DispatchWatchers()
-	go func(ch <-chan common.Action) { // listener goroutine
-		for action := range ch { // poll channel for eternity
-			// switch action.Data.(type){
-			switch action.Type {
-			case common.ACTION_INSTANCES_STATUS_UPDATE:
-				go listener1(action)
-			case common.ACTION_VOLUME_MODIFIED:
-				go listener2(action)
-			case common.ACTION_ERROR:
-				// TODO
-			default:
-				log.Printf("received invalid data of type %T", action.Data)
-			}
-		}
-	}(svc.Model.Channel)
-
-}
-
-// listener for watcher1
-func listener1(action common.Action) {
-	var (
-		rowIdx             int
-		indicesColoredRows []int
-	)
-	statuses := action.Data.([]ec2.InstanceStatus)
-	for _, status := range statuses {
-		if rowIdx = rowIndexFromTable(instancesTable, *status.InstanceId); rowIdx == -1 {
-			continue
-		}
-		cell := instancesTable.GetCell(rowIdx, COL_EC2_STATE)
-		newState := stringFromAWSVar(status.InstanceState.Name)
-		if newState != cell.Text { // State has been changed (TODO: should i change ec2svc.instances ?)
-			// Hop to state newState and trigger the onEnter function (to get the correct color)
-			state := ssm.State{Name: newState}
-			if err := EC2InstancesStateMachine.GoToState(state, true); err != nil {
-				log.Println(err)
-				return
-			}
-			colorizeRowInTable(instancesTable, rowIdx, EC2InstancesStateMachine.GetColor())
-			cell.SetText(newState) // TODO: queue draw event
-			indicesColoredRows = append(indicesColoredRows, rowIdx)
-		}
-	}
-	go func(indices []int) { // TODO: this is a cheap way of clearing colors
-		time.Sleep(3 * time.Second) // TODO
-		for i := 0; i < len(indices); i++ {
-			colorizeRowInTable(instancesTable, indices[i], tcell.ColorDefault)
-		}
-	}(indicesColoredRows)
-}
-
-func listener2(action common.Action) {
-	var rowIdx int
-	modifications := action.Data.([]ec2.VolumeModification)
-	for _, mod := range modifications {
-		if rowIdx = rowIndexFromTable(volumesTable, aws.StringValue(mod.VolumeId)); rowIdx == -1 {
-			continue
-		}
-		iopsCell := volumesTable.GetCell(rowIdx, COL_EBS_IOPS)
-		sizeCell := volumesTable.GetCell(rowIdx, COL_EBS_SIZE)
-		volTypeCell := volumesTable.GetCell(rowIdx, COL_EBS_TYPE)
-		log.Printf("%v", mod)
-		if iopsCell.Text != stringFromAWSVar(mod.TargetIops) ||
-			sizeCell.Text != stringFromAWSVar(mod.TargetSize) ||
-			volTypeCell.Text != stringFromAWSVar(mod.TargetVolumeType) {
-			log.Print("HALP")
-			if stringFromAWSVar(mod.Progress) == "100" { // TODO: that's it ?
-				iopsCell.SetText(stringFromAWSVar(mod.TargetIops))
-				sizeCell.SetText(stringFromAWSVar(mod.TargetSize))
-				volTypeCell.SetText(stringFromAWSVar(mod.TargetVolumeType))
-			}
-		}
-		// TODO: colour rows maybe ?
-	}
-}
-
-// ============ helper functions
-// Given an instance ID, return the row index of the instance in instancesTable t
-func rowIndexFromTable(t *eTable, instanceID string) int {
-	idx := -1
-	for rowIdx := 1; rowIdx < t.GetRowCount(); rowIdx++ { // 1 because first row is for column labels
-		id := t.GetCell(rowIdx, COL_EC2_ID).Text
-		if instanceID == id {
-			idx = rowIdx
-			break
-		}
-	}
-	return idx
-}
-
-// Colorize a row in a given instancesTable
-func colorizeRowInTable(t *eTable, row int, color tcell.Color) {
-	for col := 0; col < t.GetColumnCount(); col++ {
-		t.GetCell(row, col).SetBackgroundColor(color)
-	}
-}
-
-// Applying DFS to return all valid next triggers from state machine sm
-func getNextTriggersNoEmptyTriggers(sm *common.EStateMachine, emptyTriggerKey string) []ssm.Trigger {
-	var (
-		ret []ssm.Trigger
-		// nextStates = EC2InstancesStateMachine.GetNextStates()    // TODO: states differ from next triggers
-		nextTriggers = sm.GetNextTriggers()
-	)
-
-	for _, nextTrig := range nextTriggers {
-		// EC2InstancesStateMachine.GoToState(next, false)     // triggerOnEnter=false
-		if nextTrig.Key == emptyTriggerKey { // An intermediate state!
-			// if EC2InstancesStateMachine.CanFire(emptyTriggerKey){
-			sm.Fire(nextTrig.Key, nil) // Fire the empty trigger
-			ret = getNextTriggersNoEmptyTriggers(sm, emptyTriggerKey)
-		} else {
-			ret = append(ret, nextTrig) // TODO: No better way ?
-		}
-	}
-	return ret
-}
-
-// Configures a radio button (whose options are names of state actions) according to current state in a state machine sm
-func configureRadioButton(rButton *RadioButtons, sm *common.EStateMachine) {
-	// currState := ssm.State{Name: currStateText}
-	// EC2InstancesStateMachine.GoToState(currState, false)
-	var allowedActions []ssm.Trigger                  // Valid next actions/triggers will be returned here
-	if trig := sm.GetEmptyTrigger(); trig.Key != "" { // Empty trigger is defined. beware that "" is not a key
-		allowedActions = getNextTriggersNoEmptyTriggers(sm, trig.Key)
-	} else {
-		allowedActions = sm.GetNextTriggers()
-	}
-	for idx, optName := range rButton.GetOptions() { // TODO: urgh
-		enabled := false
-		for _, allowedAction := range allowedActions {
-			if allowedAction.Key == optName {
-				rButton.EnableOptionByIdx(idx)
-				enabled = true
-				break
-			}
-		}
-		if !enabled {
-			rButton.DisableOptionByIdx(idx)
-		}
-	}
-}
-
-// TODO: generalize table drawing
-// Fills the table attached instances to EBS volumes
-func fillTableEditVolume(ec2svc *ec2Service) {
-	row, _ := volumesTable.GetSelection()
-	attachments := ec2svc.volumes[row-1].Attachments
-	// if len(attachments) == 0 { // Clear table
-		tableEditVolume.Clear()
-		drawFirstRowTable(tableEditVolume)
-	// 	return
-	// }
-	for rowIdx, info := range attachments {
-		items := []interface{}{info.InstanceId, info.State, info.Device, info.AttachTime}
-		for colIdx, item := range items {
-			cell := tview.NewTableCell(stringFromAWSVar(item))
-			tableEditVolume.SetCell(rowIdx+1, colIdx, cell)
-		}
-	}
-}
-
-// TODO: generalize table drawing
-// Fills the table for EBS volumes with volume data
-func fillVolumesTable(ec2svc *ec2Service) {
-	var err error
-	if ec2svc.volumes, err = ec2svc.Model.ListVolumes(); err != nil {
-		ec2svc.showConfirmationBox(err.Error(), true, nil)
-	}
-	// if len(ec2svc.volumes) == 0 { // Clear table
-		volumesTable.Clear()
-		drawFirstRowTable(volumesTable)
-	// 	return
-	// }
-	for rowIdx, volume := range ec2svc.volumes {
-		items := []interface{}{volume.VolumeId, volume.Size, volume.VolumeType, volume.Iops, volume.State}
-		for colIdx, item := range items {
-			cell := tview.NewTableCell(stringFromAWSVar(item))
-			volumesTable.SetCell(rowIdx+1, colIdx, cell)
-		}
-	}
-}
-
-// TODO: generalize table drawing
-// Fills the table for EC2 instances with instance data
-func fillInstancesTable(ec2svc *ec2Service) {
-	var err error
-
-	if ec2svc.instances, err = ec2svc.Model.GetEC2Instances(); err != nil { // directly invokes a method on the model
-		ec2svc.showConfirmationBox(err.Error(), true, nil)
-	}
-	// if len(ec2svc.instances) == 0 { // Clear table
-		instancesTable.Clear()
-		drawFirstRowTable(instancesTable)
-	// 	return
-	// }
-	for rowIdx, instance := range ec2svc.instances {
-		items := []interface{}{instance.InstanceId, instance.ImageId, instance.InstanceType, instance.State.Name}
-		for colIdx, item := range items {
-			cell := tview.NewTableCell(stringFromAWSVar(item))
-			instancesTable.SetCell(rowIdx+1, colIdx, cell)
-		}
-	}
-}
-
-// Draws the first row for specific table, or all tables if no table was provided
-func drawFirstRowTable(t *eTable) { // Hardcoded all the way (TODO?)
-	tableToColNames := map[*eTable][]string{
-		tableEditVolume:   []string{"Instance ID", "State", "Device", "Date Attached"},
-		volumesTable:      []string{"ID", "Size (GiB)", "Type", "IOPS", "State"},
-		instancesTable:    []string{"ID", "AMI", "Type", "State"},
-		instancesTableAMI: []string{"ID", "State", "Arch", "Creation Date", "Name", "Owner ID"},
-	}
-	drawRowFunc := func(table *eTable, colNames []string) {
-		for firstColIdx := 0; firstColIdx < len(colNames); firstColIdx++ {
-			table.SetCell(0, firstColIdx,
-				tview.NewTableCell(colNames[firstColIdx]).SetAlign(tview.AlignCenter).SetSelectable(false).SetAttributes(tcell.AttrBold))
-		}
-	}
-	if colNames, ok := tableToColNames[t]; ok {
-		drawRowFunc(t, colNames)
-		return
-	}
-	for ta, co := range tableToColNames {
-		drawRowFunc(ta, co)
-	}
 }

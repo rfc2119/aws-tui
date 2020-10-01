@@ -31,7 +31,39 @@ var (
 	detachedState = ssm.State{Name: "available"}
 	deletingState = ssm.State{Name: "deleting"} // next state is "deleted", which if reached, then the API for listVolumes will return nothing.
 	creatingState = ssm.State{Name: "creating"}
+
+	// states of modifying an EBS volume
+	modifyingState = ssm.State{Name: "modifying"}
+	optimizingState = ssm.State{Name: "optimizing"}
+	completedState = ssm.State{Name: "completed"}
+	failedState = ssm.State{Name: "failed"}
 )
+
+func NewEBSVolumeModificationStateMachine() *EStateMachine {
+
+	// State machine for  events when modifying an EBS volume
+	modifiedTrigger := ssm.Trigger{Key: "modified"}
+	failedTrigger := ssm.Trigger{Key: "failed"}
+	optimizedTrigger := ssm.Trigger{Key: "optimized"}
+
+	// The state machine itself (initially in the "modifying" state) and configs
+	sm := EStateMachine{
+		StateMachine: *ssm.NewStateMachine(modifyingState),
+		color:        tcell.ColorDefault,
+	}
+	modifyingConfig := sm.Configure(modifyingState)
+	optimizingConfig := sm.Configure(optimizingState)
+
+	modifyingConfig.OnEnter(func() { sm.color = tcell.ColorYellow })
+	modifyingConfig.Permit(modifiedTrigger, optimizingState)
+	modifyingConfig.Permit(failedTrigger, failedState)
+
+	optimizingConfig.OnEnter(func() { sm.color = tcell.ColorOrange })
+	optimizingConfig.Permit(failedTrigger, failedState)
+	optimizingConfig.Permit(optimizedTrigger, completedState)
+
+	return &sm
+}
 
 func NewEBSVolumeStateMachine() *EStateMachine {
 	// State machine for the life cycle of an EBS Volume

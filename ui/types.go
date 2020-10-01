@@ -568,5 +568,5 @@ func stringFromAWSVar(awsVar interface{}) string {
 			t = ""
 		}
 	}
-	return t // TODO: return error on failure
+	return t
 }

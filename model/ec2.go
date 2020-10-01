@@ -234,6 +234,7 @@ func (mdl *EC2Model) DispatchWatchers() {
 		for {
 			<-t.C
 			watcher1(client, ch, true)
+			watcher2(client, ch)
 			// log.Println("watcher sent data")
 		}
 	}(ticker, mdl.Channel, mdl.model)
