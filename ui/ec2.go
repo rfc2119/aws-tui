@@ -437,7 +437,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 						ec2svc.showConfirmationBox(err.Error(), true, nil)
 						return
 					}
-					ec2svc.StatusBar.SetText(fmt.Sprintf("Deleting volume %s. Hit refresh to list volumes. Hit refresh", volId))
+					ec2svc.StatusBar.SetText(fmt.Sprintf("Deleting volume %s. Hit refresh to list volumes.", volId))
 					ec2svc.RootPage.ESwitchToPreviousPage()
 				}
 			})
@@ -526,22 +526,51 @@ func (ec2svc *ec2Service) setDropDownsCallbacks() {
 		if oldType != newType {
 			var (
 				iops int64 = -1
+				size int64
 				err  error
 			)
+			if size, err = strconv.ParseInt(volumesTable.GetCell(row, COL_EBS_SIZE).Text, 10, 64); err != nil {
+				ec2svc.StatusBar.SetText("numerical conversion error")
+				return
+			}
 			msg := fmt.Sprintf("Change volume type from %s to %s ?", oldType, newType)
 			volId := volumesTable.GetCell(row, COL_EBS_ID).Text
-			if newType == "io1" || newType == "io2" {
-				msg = msg + "\nNote: Please specify the required IOPS in the IOPS field " // TODO: calculate IOPS and impose it
-				if iops, err = strconv.ParseInt(inputFieldVolumeIops.GetText(), 10, 64); err != nil {
-					log.Println("numerical conversion error")
+			switch newType {
+			case "io1", "io2":
+				// Min: 100 IOPS, Max: 64000 IOPS
+				iops = size * 100
+				msg = fmt.Sprintf("%s\nNote: created with minimum IOPS of %d (100 per GiB)", msg, iops)
+			case "gp2":
+				// Baseline of 3 IOPS per GiB with a minimum of 100 IOPS, burstable to 3000
+				var tmp int64
+				if size <= 33 {
+					tmp = 100
+				} else if size > 999 {
+					tmp = 3000
+				} else {
+					tmp = size * 3
 				}
+				msg = fmt.Sprintf("%s\nNote: created with minimum tmp of %d", msg, tmp)
+			case "sc1":
+				// Baseline: 12 MB/s per TiB
+				if size < 500 {
+					size = 500
+				}
+				msg = fmt.Sprintf("%s\nNote: created with throughput %v MB/s per GiB [red](size: %d GiB)", msg, 0.012*float32(size), size) // TODO: this is probably wrong
+			case "st1":
+				if size < 500 {
+					size = 500
+				}
+				// Baseline: 40 MB/s per TiB
+				msg = fmt.Sprintf("%s\nNote: created with throughput %v MB/s per GiB [red](size: %d GiB)", msg, 0.040*float32(size), size)
 			}
 			ec2svc.showConfirmationBox(msg, true, func() {
-				if _, err := ec2svc.Model.ModifyVolume(iops, -1, newType, volId); err != nil { // alert
+				if _, err := ec2svc.Model.ModifyVolume(iops, size, newType, volId); err != nil { // alert
 					ec2svc.showConfirmationBox(err.Error(), true, nil)
 					return
 				}
 				ec2svc.StatusBar.SetText("Changing volume type to " + newType)
+				ec2svc.RootPage.ESwitchToPreviousPage()
 			})
 		}
 	})

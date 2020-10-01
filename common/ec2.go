@@ -33,10 +33,10 @@ var (
 	creatingState = ssm.State{Name: "creating"}
 
 	// states of modifying an EBS volume
-	modifyingState = ssm.State{Name: "modifying"}
+	modifyingState  = ssm.State{Name: "modifying"}
 	optimizingState = ssm.State{Name: "optimizing"}
-	completedState = ssm.State{Name: "completed"}
-	failedState = ssm.State{Name: "failed"}
+	completedState  = ssm.State{Name: "completed"}
+	failedState     = ssm.State{Name: "failed"}
 )
 
 func NewEBSVolumeModificationStateMachine() *EStateMachine {
