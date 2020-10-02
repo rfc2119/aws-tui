@@ -2,6 +2,7 @@ package main
 
 import (
 	// "context"        // TODO
+	// "runtime/debug"
 	"fmt"
 	"rfc2119/aws-tui/common"
 	"rfc2119/aws-tui/ui"
@@ -21,11 +22,18 @@ Common keys found across all windows:
 	?               View help messages (if available)
 	q               Move back one page (will exit this help message)
     Space           Select Option in a radio box/tree view (except in a confirmation box)
+    hjkl		Movement keys
 
 There's likely a help page for every window, so please use '?'. Use Ctrl-C to exit the application.
 `
-	version = "0.1" // TODO: git commit's SHA added to the built binary
+)
 
+var (
+	// Filled by goreleaser
+	version = ""
+	commit  = ""
+	date    = ""
+	// branch  = ""
 )
 
 func main() {
@@ -89,9 +97,11 @@ func main() {
     Region:        %7s
 
     Build Version: %s
+    Build Commit:  %s
+    Build Date:    %s
     SDK Name:      %7s
     SDK Version:   %-7s
-    `, *currentIAMUser.UserName, *currentIAMUser.Arn, config.Region, version, aws.SDKName, aws.SDKVersion)
+    `, *currentIAMUser.UserName, *currentIAMUser.Arn, config.Region, version, commit, date, aws.SDKName, aws.SDKVersion)
 
 	// ui config
 	tree.SetRoot(rootNode)

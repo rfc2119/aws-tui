@@ -3,6 +3,7 @@ package main
 // Inspired from [awsls](https://github.com/jckuester/awsls) readme file
 // TODO:  should be executed when building for releases
 import (
+	"os"
 	"rfc2119/aws-tui/common"
 	"text/template"
 )
@@ -17,7 +18,7 @@ var readmeTable = `
 {{ end }}
 `
 
-func AppendReadMeTable(readmeFileName string) {
+func AppendReadMeTable(readmeFileName string) error {
 	f, err := os.OpenFile(readmeFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
