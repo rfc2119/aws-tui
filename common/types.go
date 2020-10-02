@@ -268,7 +268,7 @@ var AWServicesDescriptions = map[int]awsServiceDescription{
 
 	ServiceElasticBlockStore: {
 		Name: "Amazon Elastic Block Store (EBS)", Description: "Scalable Storage in the Cloud", Available: false,
-	},		// Merged in the EC2 service
+	},		// Merged in the EC2 service for now
 
 	ServiceGlacier: {
 		Name: "Amazon Glacier", Description: "Low-Cost Archive Storage in the Cloud", Available: false,
