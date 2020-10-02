@@ -1,9 +1,5 @@
 package common
 
-// import (
-// 	"github.com/aws/aws-sdk-go-v2/service/ec2"
-// )
-
 // v2 of the aws go sdk is used
 
 const (
@@ -14,8 +10,90 @@ const (
 
 	// Defining the services themselves as numeric constants
 	// Used onwards to tweak service names and configs. This will probably be replaced
-	SERVICE_EC2 // EBS included (w/o snapshot management)
-	SERVICE_IAM
+	ServiceEc2
+	ServiceLambda
+	ServiceVirtualPrivateCloud
+	ServiceElasticBeanstalk
+	ServiceEc2AutoScaling
+	ServiceBatch
+	ServiceServerlessApplicationRepository
+	ServiceElasticContainerRegistry
+	ServiceElasticContainerService
+	ServiceFargate
+	ServiceElasticKubernetesService
+	ServiceS3
+	ServiceElasticBlockStore
+	ServiceGlacier
+	ServiceSnowball
+	ServiceStorageGateway
+	ServiceElasticFileSystem
+	ServiceBackup
+	ServiceRelationalDatabaseService
+	ServiceDynamodb
+	ServiceAurora
+	ServiceElasticache
+	ServiceNeptune
+	ServiceKeyspaces
+	ServiceDatabaseMigrationService
+	ServiceServerMigrationService
+	databaseMigrationService
+	ServiceCloudfront
+	ServiceDirectConnect
+	ServiceRoute53
+	ServiceTransitGateway
+	ServicePrivatelink
+	elasticLoadBalancing
+	ServiceApiGateway
+	ServiceAppsync
+	ServiceCodedeploy
+	ServiceXRay
+	ServiceCodebuild
+	ServiceCodecommit
+	ServiceWorkspaces
+	ServiceCloudwatch
+	ServiceOrganizations
+	ServiceEc2SystemsManager
+	ServiceCloudformation
+	ServiceCloudtrail
+	ServiceConfig
+	ServiceManagementConsole
+	ServiceLicenseManager
+	ServicePersonalHealthDashboard
+	ServiceBudgets
+	ServiceCostExplorer
+	ServiceCostUsageReport
+	reservedInstanceRiReporting
+	ServiceIdentityAndAccessManagement
+	ServiceCognito
+	ServiceDirectoryService
+	ServiceKeyManagementService
+	ServiceSecretsManager
+	ServiceCertificateManager
+	ServiceRedshift
+	ServiceElasticsearchService
+	ServiceElasticMapreduce
+	ServiceKinesisDataStreams
+	ServiceKinesisDataFirehose
+	ServiceGlue
+	ServiceAthena
+	ServiceManagedStreamingForApacheKafka
+	ServiceSimpleWorkflow
+	ServiceStepFunctions
+	ServiceEventbridge
+	ServiceSimpleQueueService
+	ServiceSimpleNotificationService
+	freertos
+	ServiceIotGreengrass
+	ServiceIotDeviceDefender
+	ServiceIotCore
+	ServiceIotDeviceManagement
+	ServicePremiumSupport
+	ServiceDeepLearningAmis
+	ServicePolly
+	ServiceTranscribe
+	ServiceSagemaker
+	ServiceGamelift
+	ServiceElementalMediaconvert
 
 	// filters
 	FILTER_AFFINITY
@@ -133,22 +211,355 @@ const (
 	FILTER_VPC_ID
 )
 
+type awsServiceDescription struct {
+	Name        string
+	Description string
+	Available   bool
+}
+
+var AWServicesDescriptions = map[int]awsServiceDescription{
+	ServiceEc2: {
+		Name: "Amazon EC2", Description: "Virtual Servers in the Cloud", Available: true,
+	},
+
+	ServiceLambda: {
+		Name: "AWS Lambda", Description: "Run Code Without Thinking About Servers", Available: false,
+	},
+
+	ServiceVirtualPrivateCloud: {
+		Name: "Amazon Virtual Private Cloud (VPC)", Description: "Isolated Cloud Resources", Available: false,
+	},
+
+	ServiceElasticBeanstalk: {
+		Name: "AWS Elastic Beanstalk", Description: "AWS Application Container", Available: false,
+	},
+
+	ServiceEc2AutoScaling: {
+		Name: "Amazon EC2 Auto Scaling", Description: "Add or remove compute capacity to meet changes in demand", Available: false,
+	},
+
+	ServiceBatch: {
+		Name: "AWS Batch", Description: "Fully managed batch processing at any scale", Available: false,
+	},
+
+	ServiceServerlessApplicationRepository: {
+		Name: "AWS Serverless Application Repository", Description: "Discover, deploy, publish and share serverless applications", Available: false,
+	},
+
+	ServiceElasticContainerRegistry: {
+		Name: "Amazon Elastic Container Registry", Description: "Store and Retrieve Docker Images", Available: false,
+	},
+
+	ServiceElasticContainerService: {
+		Name: "Amazon Elastic Container Service", Description: "Run containerized applications in production", Available: false,
+	},
+
+	ServiceFargate: {
+		Name: "AWS Fargate", Description: "Run containers without managing servers or clusters", Available: false,
+	},
+
+	ServiceElasticKubernetesService: {
+		Name: "Amazon Elastic Kubernetes Service (EKS)", Description: "Fully managed Kubernetes service", Available: false,
+	},
+
+	ServiceS3: {
+		Name: "Amazon S3", Description: "Scalable Storage in the Cloud", Available: false,
+	},
+
+	ServiceElasticBlockStore: {
+		Name: "Amazon Elastic Block Store (EBS)", Description: "Scalable Storage in the Cloud", Available: false,
+	},		// Merged in the EC2 service
+
+	ServiceGlacier: {
+		Name: "Amazon Glacier", Description: "Low-Cost Archive Storage in the Cloud", Available: false,
+	},
+
+	ServiceSnowball: {
+		Name: "AWS Snowball", Description: "Move petabyte-scale data sets", Available: false,
+	},
+
+	ServiceStorageGateway: {
+		Name: "AWS Storage Gateway", Description: "Integrates on-premises IT environments with Cloud storage", Available: false,
+	},
+
+	ServiceElasticFileSystem: {
+		Name: "Amazon Elastic File System", Description: "Full managed file system for EC2", Available: false,
+	},
+
+	ServiceBackup: {
+		Name: "AWS Backup", Description: "Centralized backup across AWS services", Available: false,
+	},
+
+	ServiceRelationalDatabaseService: {
+		Name: "Amazon Relational Database Service (RDS)", Description: "Managed Relational Database Service", Available: false,
+	},
+
+	ServiceDynamodb: {
+		Name: "Amazon DynamoDB", Description: "Dynamic Databases in the Cloud", Available: false,
+	},
+
+	ServiceAurora: {
+		Name: "Amazon Aurora", Description: "MySQL and PostgreSQL Compatible Relational Database Built for the Cloud", Available: false,
+	},
+
+	ServiceElasticache: {
+		Name: "Amazon ElastiCache", Description: "In-Memory Caching Service", Available: false,
+	},
+
+	ServiceNeptune: {
+		Name: "Amazon Neptune", Description: "Fast, reliable graph database built for the cloud", Available: false,
+	},
+
+	ServiceKeyspaces: {
+		Name: "Amazon Keyspaces (for Apache Cassandra)", Description: "Managed Cassandra-compatible database", Available: false,
+	},
+
+	ServiceDatabaseMigrationService: {
+		Name: "AWS Database Migration Service", Description: "Migrate your databases to AWS with minimal downtime", Available: false,
+	},
+
+	ServiceServerMigrationService: {
+		Name: "AWS Server Migration Service", Description: "Easy migration of on-premises workloads to AWS", Available: false,
+	},
+
+	databaseMigrationService: {
+		Name: "Database Migration Service", Description: "Migrate your databases to AWS with minimal downtime", Available: false,
+	},
+
+	ServiceCloudfront: {
+		Name: "Amazon CloudFront", Description: "Global Content Delivery Network", Available: false,
+	},
+
+	ServiceDirectConnect: {
+		Name: "AWS Direct Connect", Description: "Dedicated Network Connection to AWS", Available: false,
+	},
+
+	ServiceRoute53: {
+		Name: "Amazon Route 53", Description: "A reliable and cost-effective way to route end users to Internet applications", Available: false,
+	},
+
+	ServiceTransitGateway: {
+		Name: "AWS Transit Gateway", Description: "Easily scale VPC and account connections", Available: false,
+	},
+
+	ServicePrivatelink: {
+		Name: "AWS PrivateLink", Description: "Access services hosted on AWS easily and securely by keeping your network traffic within the AWS network", Available: false,
+	},
+
+	elasticLoadBalancing: {
+		Name: "Elastic Load Balancing", Description: "Distribute incoming traffic across multiple targets", Available: false,
+	},
+
+	ServiceApiGateway: {
+		Name: "Amazon API Gateway", Description: "Create, Publish, Maintain, Monitor, and Secure APIs at Any Scale", Available: false,
+	},
+
+	ServiceAppsync: {
+		Name: "AWS AppSync", Description: "Build data-driven apps with real-time and offline capabilities", Available: false,
+	},
+
+	ServiceCodedeploy: {
+		Name: "AWS CodeDeploy", Description: "Automate Code Deployments", Available: false,
+	},
+
+	ServiceXRay: {
+		Name: "AWS X-Ray", Description: "Analyze and debug your applications", Available: false,
+	},
+
+	ServiceCodebuild: {
+		Name: "AWS CodeBuild", Description: "Build and test code with continuous scaling.", Available: false,
+	},
+
+	ServiceCodecommit: {
+		Name: "AWS CodeCommit", Description: "Securely host highly scalable private Git repositories. Collaborate on code.", Available: false,
+	},
+
+	ServiceWorkspaces: {
+		Name: "Amazon WorkSpaces", Description: "Virtual desktops in the cloud", Available: false,
+	},
+
+	ServiceCloudwatch: {
+		Name: "Amazon CloudWatch", Description: "Resource and Application Monitoring", Available: false,
+	},
+
+	ServiceOrganizations: {
+		Name: "AWS Organizations", Description: "Central governance and management across AWS accounts", Available: false,
+	},
+
+	ServiceEc2SystemsManager: {
+		Name: "Amazon EC2 Systems Manager", Description: "Configure and manage Amazon EC2 and on-premises system", Available: false,
+	},
+
+	ServiceCloudformation: {
+		Name: "AWS CloudFormation", Description: "Templates for AWS Resource Creation", Available: false,
+	},
+
+	ServiceCloudtrail: {
+		Name: "AWS CloudTrail", Description: "Track user activity and API usage", Available: false,
+	},
+
+	ServiceConfig: {
+		Name: "AWS Config", Description: "AWS resource inventory and configuration history", Available: false,
+	},
+
+	ServiceManagementConsole: {
+		Name: "AWS Management Console", Description: "Web-Based User Interface", Available: false,
+	},
+
+	ServiceLicenseManager: {
+		Name: "AWS License Manager", Description: "Set rules to manage, discover, and report software license usage", Available: false,
+	},
+
+	ServicePersonalHealthDashboard: {
+		Name: "AWS Personal Health Dashboard", Description: "Personalized view of AWS service health", Available: false,
+	},
+
+	ServiceBudgets: {
+		Name: "AWS Budgets", Description: "Set custom budgets that alert you when you exceed your budgeted thresholds", Available: false,
+	},
+
+	ServiceCostExplorer: {
+		Name: "AWS Cost Explorer", Description: "Visualize, understand, and manage your AWS costs and usage over time", Available: false,
+	},
+
+	ServiceCostUsageReport: {
+		Name: "AWS Cost & Usage Report", Description: "Dive deeper into your costs and usage", Available: false,
+	},
+
+	reservedInstanceRiReporting: {
+		Name: "Reserved Instance (RI) Reporting", Description: "Manage and monitor your instance reservations", Available: false,
+	},
+
+	ServiceIdentityAndAccessManagement: {
+		Name: "AWS Identity and Access Management (IAM)", Description: "Configurable AWS Access Controls", Available: true,
+	},
+
+	ServiceCognito: {
+		Name: "Amazon Cognito", Description: "User Sign-up and Sign-in", Available: false,
+	},
+
+	ServiceDirectoryService: {
+		Name: "AWS Directory Service", Description: "Host and Manage Active Dirctory", Available: false,
+	},
+
+	ServiceKeyManagementService: {
+		Name: "AWS Key Management Service", Description: "Easily create and control the keys used to encrypt your data", Available: false,
+	},
+
+	ServiceSecretsManager: {
+		Name: "AWS Secrets Manager", Description: "Rotate, manage, and retrieve secrets", Available: false,
+	},
+
+	ServiceCertificateManager: {
+		Name: "AWS Certificate Manager (ACM)", Description: "Provision, manage, and deploy SSL/TLS certificates", Available: false,
+	},
+
+	ServiceRedshift: {
+		Name: "Amazon Redshift", Description: "Fast, Simple, Cost-effective Data Warehousing", Available: false,
+	},
+
+	ServiceElasticsearchService: {
+		Name: "Amazon Elasticsearch Service", Description: "Fully managed, reliable, and scalable Elasticsearch service", Available: false,
+	},
+
+	ServiceElasticMapreduce: {
+		Name: "Amazon Elastic MapReduce", Description: "Hosted Hadoop Framework", Available: false,
+	},
+
+	ServiceKinesisDataStreams: {
+		Name: "Amazon Kinesis Data Streams", Description: "Amazon Kinesis Data Streams", Available: false,
+	},
+
+	ServiceKinesisDataFirehose: {
+		Name: "Amazon Kinesis Data Firehose", Description: "Prepare and load real-time data streams into data stores and analytics tools", Available: false,
+	},
+
+	ServiceGlue: {
+		Name: "AWS Glue", Description: "Prepare and load data", Available: false,
+	},
+
+	ServiceAthena: {
+		Name: "Amazon Athena", Description: "Query data in S3 using SQL", Available: false,
+	},
+
+	ServiceManagedStreamingForApacheKafka: {
+		Name: "Amazon Managed Streaming for Apache Kafka (MSK)", Description: "Fully managed, highly available, and secure Apache Kafka service", Available: false,
+	},
+
+	ServiceSimpleWorkflow: {
+		Name: "Amazon Simple Workflow", Description: "Workflow service for coordinating applications", Available: false,
+	},
+
+	ServiceStepFunctions: {
+		Name: "AWS Step Functions", Description: "Build distributed applications using visual workflows", Available: false,
+	},
+
+	ServiceEventbridge: {
+		Name: "Amazon EventBridge", Description: "Serverless event bus that connects application data from your own apps, SaaS, and AWS services", Available: false,
+	},
+
+	ServiceSimpleQueueService: {
+		Name: "Amazon Simple Queue Service (SQS)", Description: "Message Queue Service", Available: false,
+	},
+
+	ServiceSimpleNotificationService: {
+		Name: "Amazon Simple Notification Service (SNS)", Description: "Push Notification Service", Available: false,
+	},
+
+	freertos: {
+		Name: "FreeRTOS", Description: "IoT operating system for microcontrollers", Available: false,
+	},
+
+	ServiceIotGreengrass: {
+		Name: "AWS IoT Greengrass", Description: "Bring local compute, messaging, data management, sync, and ML inference capabilities to edge devices", Available: false,
+	},
+
+	ServiceIotDeviceDefender: {
+		Name: "AWS IoT Device Defender", Description: "Security management for IoT devices", Available: false,
+	},
+
+	ServiceIotCore: {
+		Name: "AWS IoT Core", Description: "Easily and securely connect devices to the cloud. Reliably scale to billions of devices and trillions of messages.", Available: false,
+	},
+
+	ServiceIotDeviceManagement: {
+		Name: "AWS IoT Device Management", Description: "Onboard, organize, monitor, and remotely manage connected devices at scale", Available: false,
+	},
+
+	ServicePremiumSupport: {
+		Name: "AWS Premium Support", Description: "One-on-one, Fast-response Support Channel", Available: false,
+	},
+
+	ServiceDeepLearningAmis: {
+		Name: "AWS Deep Learning AMIs", Description: "Quickly build deep learning applications", Available: false,
+	},
+
+	ServicePolly: {
+		Name: "Amazon Polly", Description: "Turn text into lifelike speech using deep learning", Available: false,
+	},
+
+	ServiceTranscribe: {
+		Name: "Amazon Transcribe", Description: "Automatically convert speech to text", Available: false,
+	},
+
+	ServiceSagemaker: {
+		Name: "Amazon SageMaker", Description: "Machine learning for every developer and data scientist", Available: false,
+	},
+
+	ServiceGamelift: {
+		Name: "Amazon GameLift", Description: "Simple, fast, cost-effective dedicated game server hosting.", Available: false,
+	},
+
+	ServiceElementalMediaconvert: {
+		Name: "AWS Elemental MediaConvert", Description: "Process video files and clips to prepare on-demand content for distribution or archiving", Available: false},
+}
+
 // convenient maps *shrugs*
-// map to unify service names
-var ServiceNames = map[int]string{
-	SERVICE_EC2: "ec2", // plus EBS as well
-	SERVICE_IAM: "iam",
-}
 
-// map of subitems (tree children) names appearing at front page. this should be modeled as a tree object with children as tree nodes. this works for now
+// map of sub items (tree children) names appearing at front page. this should be modeled as a tree object with children as tree nodes. this works for now
 var ServiceChildrenNames = map[int][]string{
-	SERVICE_EC2: []string{"Instances", "Volumes"},
-	SERVICE_IAM: []string{"TODO"},
-}
-
-var AvailableServices = map[int]bool{
-	SERVICE_EC2: true,
-	SERVICE_IAM: true,
+	ServiceEc2: []string{"Instances", "Volumes"},
+	ServiceIdentityAndAccessManagement: []string{"TODO"},
 }
 
 // map of filter names and some of the default values

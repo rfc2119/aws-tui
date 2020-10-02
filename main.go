@@ -57,9 +57,9 @@ func main() {
 
 	// filling the tree with initial values
 	rootNode := tview.NewTreeNode("Services")
-	for service, name := range common.ServiceNames {
-		if common.AvailableServices[service] {
-			nodeLevel1 := tview.NewTreeNode(name)
+	for service, desc := range common.AWServicesDescriptions {
+		if desc.Available {
+			nodeLevel1 := tview.NewTreeNode(desc.Name)
 			for _, subItemName := range common.ServiceChildrenNames[service] {
 				nodeLevel2 := tview.NewTreeNode(subItemName)
 				nodeLevel1.AddChild(nodeLevel2)

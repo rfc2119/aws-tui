@@ -280,48 +280,47 @@ func (ec2svc *ec2Service) setCallbacks() {
 			currOpt := instanceStatusRadioButton.GetCurrentOptionName()
 			msg := fmt.Sprintf("%s instance ?", currOpt)
 			ec2svc.showConfirmationBox(msg, true, func() {
-				// ec2svc.StatusBar.SetText(fmt.Sprintf("%#v", test))
 				row, _ := instancesTable.GetSelection() // TODO: multi selection
 				instanceIds := []string{instancesTable.GetCell(row, COL_EC2_ID).Text}
 				switch strings.ToLower(currOpt) { // TODO: do something w/ return value
-				case "start": // TODO: magic names
+				case "Start": // TODO: magic names
 					if _, err := ec2svc.Model.StartEC2Instances(instanceIds); err != nil {
-						ec2svc.showConfirmationBox(err.Error(), false, nil) // TODO: spread
-						ec2svc.StatusBar.SetText(err.Error())               // TODO: logging
+						ec2svc.showConfirmationBox(err.Error(), false, nil)
+						// ec2svc.StatusBar.SetText(err.Error())               // TODO: logging
 						return
 					}
-				case "stop":
+				case "Stop":
 					if _, err := ec2svc.Model.StopEC2Instances(instanceIds, false, false); err != nil {
-						ec2svc.showConfirmationBox(err.Error(), false, nil) // TODO: spread
+						ec2svc.showConfirmationBox(err.Error(), false, nil)
 						// ec2svc.StatusBar.SetText(err.Error())	// TODO: logging
 						return
 					}
-				case "hibernate":
+				case "Hibernate":
 					if _, err := ec2svc.Model.StopEC2Instances(instanceIds, false, true); err != nil { // hibernate=true
-						ec2svc.showConfirmationBox(err.Error(), false, nil) // TODO: spread
+						ec2svc.showConfirmationBox(err.Error(), false, nil)
 						// ec2svc.StatusBar.SetText(err.Error())	// TODO: logging
 						return
 					}
-				case "stop (force)":
+				case "Stop (Force)":
 					if _, err := ec2svc.Model.StopEC2Instances(instanceIds, true, false); err != nil { // force=true
-						ec2svc.showConfirmationBox(err.Error(), false, nil) // TODO: spread
+						ec2svc.showConfirmationBox(err.Error(), false, nil)
 						// ec2svc.StatusBar.SetText(err.Error())	// TODO: logging
 						return
 					}
-				case "reboot":
+				case "Reboot":
 					if err := ec2svc.Model.RebootEC2Instances(instanceIds); err != nil {
-						ec2svc.showConfirmationBox(err.Error(), false, nil) // TODO: spread
+						ec2svc.showConfirmationBox(err.Error(), false, nil)
 						// ec2svc.StatusBar.SetText(err.Error())	// TODO: logging
 						return
 					}
-				case "terminate":
+				case "Terminate":
 					if _, err := ec2svc.Model.TerminateEC2Instances(instanceIds); err != nil {
-						ec2svc.showConfirmationBox(err.Error(), false, nil) // TODO: spread
+						ec2svc.showConfirmationBox(err.Error(), false, nil)
 						// ec2svc.StatusBar.SetText(err.Error())	// TODO: logging
 						return
 					}
 				}
-				ec2svc.StatusBar.SetText(fmt.Sprintf("%sing instance", currOpt))
+				ec2svc.StatusBar.SetText(fmt.Sprintf("%sing instance(s) %v", currOpt, instanceIds))
 			})
 		},
 	}
@@ -598,7 +597,7 @@ func (svc *ec2Service) WatchChanges() {
 
 }
 
-// TODO: description
+// TODO: description for this function
 // TODO: return proper errors
 func hopToStateAndColorizeRowInTable(table *eTable, row, col int, newStateText string, sm *common.EStateMachine) int {
 	cell := table.GetCell(row, col)
@@ -654,7 +653,6 @@ func listener2(action common.Action) {
 		if iopsCell.Text != stringFromAWSVar(mod.TargetIops) ||
 			sizeCell.Text != stringFromAWSVar(mod.TargetSize) ||
 			volTypeCell.Text != stringFromAWSVar(mod.TargetVolumeType) {
-			// log.Printf("Progress: %s", stringFromAWSVar(mod.Progress))
 			if stringFromAWSVar(mod.Progress) == "100" { // TODO: that's it ?
 				iopsCell.SetText(stringFromAWSVar(mod.TargetIops))
 				sizeCell.SetText(stringFromAWSVar(mod.TargetSize))

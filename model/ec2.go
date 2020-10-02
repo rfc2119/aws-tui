@@ -25,7 +25,7 @@ type EC2Model struct {
 func NewEC2Model(config aws.Config) *EC2Model {
 	return &EC2Model{
 		model:   ec2.New(config),
-		Name:    common.ServiceNames[common.SERVICE_EC2],
+		Name:    common.AWServicesDescriptions[common.ServiceEc2].Name,
 		Channel: make(chan common.Action),
 	}
 }

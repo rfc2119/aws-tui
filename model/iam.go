@@ -18,7 +18,7 @@ type IAModel struct {
 func NewIAModel(config aws.Config) *IAModel {
 	return &IAModel{
 		model:   iam.New(config),
-		Name:    common.ServiceNames[common.SERVICE_EC2],
+		Name:    common.AWServicesDescriptions[common.ServiceIdentityAndAccessManagement].Name,
 		Channel: make(chan common.Action),
 	}
 }
