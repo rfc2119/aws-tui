@@ -1,8 +1,9 @@
-# Customized configuration file for goreleaser from awsls
+# Customized configuration file for goreleaser (initially taken from awsls repo)
 builds:
   - 
     goos:
       - linux
+      - windows
     env:
       - CGO_ENABLED=0
     goarch:
@@ -13,7 +14,7 @@ builds:
 archives:
   - files:
     - none*
-  #   - format: tar.gz
-  #     format_overrides:
-  #       - goos: windows
-  #         format: zip
+  - format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
