@@ -1,5 +1,65 @@
-
 # AWS Terminal Interface
+
+[TOC]
+
+Unofficial terminal interface for AWS. This is still a work in progress
+
+## Download
+
+Go to the [releases](https://github.com/rfc2119/aws-tui/releases) page and grab the latest version. Additionally, since this interface is based on the AWS Go SDK, you can compile it from source by cloning this repository and running `go build main.go` and running the output binary file
+
+## Quick Start
+
+Configure your credentials file the same way you use for the AWS CLI or the SDK (command-line options are not supported). To re-iterate the [documentation](https://docs.aws.amazon.com/sdk-for-go/api/):
+
+>  When using the SDK you'll generally need your AWS credentials to authenticate with AWS services. The SDK supports multiple methods of supporting these credentials. By default the SDK will source credentials automatically from its default credential chain. [..] The common items in the credential chain are the following:
+>
+>  * Environment Credentials - Set of environment variables (see [supported list](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html#envvars-list))
+>  * Shared Credentials [file](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html) (~/.aws/credentials)
+>  * EC2 Instance Role Credentials
+
+Launch the binary and there you go!
+
+## Navigation
+
+I tried to follow a vim-like key configuration for most of the cases. There's a help page for every window, which you can display by hitting `?`. These are common keys found across all windows: 
+
+
+
+| Key  | Function |
+| :--: | :------: |
+| TAB  | Move to neighboring windows         |
+| ?     |View help messages (if available) |
+|q|Move back one page (will exit this help message) |
+|Space|Select Option in a radio box/tree view (except in a confirmation box) |
+|hjkl|Movement keys|
+
+## Known Issues
+
+TODO (see [issues](https://github.com/rfc2119/aws-tui/issues) for now)
+
+## Architecture
+
+A quick overview of the architecture is drafted at [architecture.md](https://github.com/rfc2119/aws-tui/blob/master/architecture.md)
+
+## Contributing
+
+Obviously this would be a huge effort for anyone to do all the work alone. If you have any issues, feature requests or would like to maintain/contribute to the software, please do not hesitate to submit an [issue](https://github.com/rfc2119/aws-tui/issues).
+
+TODO: Contributing guide
+
+## Support
+
+[#aws-tui](https://matrix.to/#/!qtnxAcIRKrplnRzpxr:matrix.org?via=matrix.org) on matrix (will be bridged soon to IRC)
+
+## Acknowledgement
+
+I am forever indebted to all open-source community and its projects. The interface uses the work of:
+
+1.  [tcell](https://github.com/gdamore/tcell/): grid-based terminal view for Go
+2. [tview](https://github.com/rivo/tview/): the wonderful and amazing framework for creating rich interactive terminal-based programs
+3. The [AWS SDK V2](https://github.com/aws/aws-sdk-go-v2/) for Go
+4. The [Go](https://github.com/golang/go) team
 
 # Current Working Services
 
@@ -90,3 +150,7 @@
 |Amazon GameLift |  | Simple, fast, cost-effective dedicated game server hosting.|
 |AWS Elemental MediaConvert |  | Process video files and clips to prepare on-demand content for distribution or archiving|
 
+
+```
+
+```

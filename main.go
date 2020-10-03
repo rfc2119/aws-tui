@@ -24,12 +24,12 @@ Common keys found across all windows:
     Space           Select Option in a radio box/tree view (except in a confirmation box)
     hjkl		Movement keys
 
-There's likely a help page for every window, so please use '?'. Use Ctrl-C to exit the application.
+There's likely a help page for every window, so please use '?' when in doubt. Use Ctrl-C to exit the application.
 `
 )
 
 var (
-	// Filled by goreleaser
+	// Filled by goreleaser at build time
 	version = ""
 	commit  = ""
 	date    = ""
@@ -45,25 +45,24 @@ func main() {
 	if err != nil {
 		panic("unable to load SDK config, " + err.Error())
 	}
-	fmt.Println("halp")
 
-	// application, root element and status bar
+	// Application, root element and status bar
 	app := tview.NewApplication()
 	pages := ui.NewEPages()
 	statusBar := ui.NewStatusBar()
 
-	// services
+	// Services
 	ec2svc := ui.NewEC2Service(config, app, pages, statusBar)
 	ec2svc.InitView() // TODO: call only when user selects the service
 	iamsvc := ui.NewIAMService(config, app, pages, statusBar)
 
-	// ui elements
-	mainContainer := tview.NewFlex() // a flex container for the status bar and application pages/window
-	frontPage := ui.NewEFlex(pages)  // the front page which holds the info and tree view
-	info := tview.NewTextView()
-	tree := tview.NewTreeView()
+	// UI elements
+	mainContainer := tview.NewFlex() // Flex container for the status bar and application pages/window
+	frontPage := ui.NewEFlex(pages)  // The front page which holds the info and tree view
+	info := tview.NewTextView()	// The side bar informational view
+	tree := tview.NewTreeView()	// The menu holding all available services
 
-	// filling the tree with initial values
+	// Filling the tree with initial values
 	rootNode := tview.NewTreeNode("Services")
 	for service, desc := range common.AWServicesDescriptions {
 		if desc.Available {
@@ -88,7 +87,7 @@ func main() {
 		}
 	})
 
-	// filling the info box with initial values
+	// Filling the info box with initial values
 	currentIAMUser := iamsvc.Model.GetCurrentUserInfo()
 	fmt.Fprintf(info,
 		`
@@ -103,7 +102,7 @@ func main() {
     SDK Version:   %-7s
     `, *currentIAMUser.UserName, *currentIAMUser.Arn, config.Region, version, commit, date, aws.SDKName, aws.SDKVersion)
 
-	// ui config
+	// UI config
 	tree.SetRoot(rootNode)
 	tree.SetCurrentNode(rootNode)
 
@@ -113,10 +112,10 @@ func main() {
 	frontPage.AddItem(info, 0, 2, false)
 
 	mainContainer.SetDirection(tview.FlexRow).SetFullScreen(true)
-	mainContainer.AddItem(pages, 0, 107, true)    //AddItem(item Primitive, fixedSize, proportion int, focus bool)
+	mainContainer.AddItem(pages, 0, 107, true)    // AddItem(item Primitive, fixedSize, proportion int, focus bool)
 	mainContainer.AddItem(statusBar, 0, 1, false) // 107:1 seems fair ?
 
-	pages.EAddPage("Services", frontPage, true, true) // EAddPage(name string, item tview.Primitive, resize, visible bool)
+	pages.EAddPage("Services", frontPage, true, true) // (name string, item tview.Primitive, resize, visible bool)
 	statusBar.SetText("Welcome to the terminal interface for AWS. Type '?' to get help")
 	if err := app.SetRoot(mainContainer, true).SetFocus(mainContainer).Run(); err != nil {
 		panic(err)

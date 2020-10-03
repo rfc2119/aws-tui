@@ -2,6 +2,7 @@
 builds:
   - 
     goos:
+      - darwin
       - linux
       - windows
     env:

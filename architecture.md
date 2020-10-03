@@ -37,4 +37,6 @@ type Action struct {
 ``` 
 The `Data` differs in each message and is defined manually for each action. After receiving a message, the UI component also acts appropriately. See *common/types.go* for definitions of example actions.
 
-the view must explicitly call the `watch` method of a service with a given channel to receive updates from the model on the channel
+TODO
+* defining types for the `Data` field is deprecated temporarily
+* explain DispatchWatchers() and view listeners
