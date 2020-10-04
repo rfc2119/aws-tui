@@ -3,8 +3,8 @@ package ui
 import (
 	"fmt"
 	"log"
-	"rfc2119/aws-tui/common"
-	"rfc2119/aws-tui/model"
+	"github.com/rfc2119/aws-tui/common"
+	"github.com/rfc2119/aws-tui/model"
 	"strconv"
 	"strings"
 	"time"

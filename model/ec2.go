@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
     "strings"
-	"rfc2119/aws-tui/common"
+	"github.com/rfc2119/aws-tui/common"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"

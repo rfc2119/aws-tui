@@ -1,4 +1,4 @@
-module rfc2119/aws-tui
+module github.com/rfc2119/aws-tui
 
 go 1.13
 
@@ -12,7 +12,6 @@ require (
 	github.com/rfc2119/simple-state-machine v0.0.0-20200921151301-9684ead3565f
 	github.com/rivo/tview v0.0.0-20200915114512-42866ecf6ca6
 	github.com/stretchr/testify v1.6.1
-	golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2
 	golang.org/x/sys v0.0.0-20200918174421-af09f7315aff // indirect
 	golang.org/x/text v0.3.3 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect

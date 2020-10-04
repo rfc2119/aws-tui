@@ -4,8 +4,8 @@ import (
 	// "context"        // TODO
 	// "runtime/debug"
 	"fmt"
-	"rfc2119/aws-tui/common"
-	"rfc2119/aws-tui/ui"
+	"github.com/rfc2119/aws-tui/common"
+	"github.com/rfc2119/aws-tui/ui"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/external"

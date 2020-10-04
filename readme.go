@@ -4,7 +4,7 @@ package main
 // TODO:  should be executed when building for releases
 import (
 	"os"
-	"rfc2119/aws-tui/common"
+	"github.com/rfc2119/aws-tui/common"
 	"text/template"
 )
 
