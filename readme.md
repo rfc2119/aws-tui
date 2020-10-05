@@ -4,6 +4,9 @@
 
 Unofficial terminal interface for AWS. This is still a work in progress
 
+[![demo-aws-tui-asciicast](https://asciinema.org/a/363590.svg)](https://asciinema.org/a/363590)
+
+*Note: The distortion in the above recording is due to asciinema's player.*
 ## Download
 
 Go to the [releases](https://github.com/rfc2119/aws-tui/releases) page and grab the latest version. Additionally, since this interface is based on the AWS Go SDK, you can compile it from source by cloning this repository and running `go build main.go` and running the output binary file
