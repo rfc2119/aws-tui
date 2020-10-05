@@ -50,7 +50,7 @@ TODO: Contributing guide
 
 ## Support
 
-[#aws-tui](https://matrix.to/#/!qtnxAcIRKrplnRzpxr:matrix.org?via=matrix.org) on matrix (will be bridged soon to IRC)
+\#aws-tui on Freenode
 
 ## Acknowledgement
 

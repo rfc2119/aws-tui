@@ -282,7 +282,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 			ec2svc.showConfirmationBox(msg, true, func() {
 				row, _ := instancesTable.GetSelection() // TODO: multi selection
 				instanceIds := []string{instancesTable.GetCell(row, COL_EC2_ID).Text}
-				switch strings.ToLower(currOpt) { // TODO: do something w/ return value
+				switch currOpt { // TODO: do something w/ return value
 				case "Start": // TODO: magic names
 					if _, err := ec2svc.Model.StartEC2Instances(instanceIds); err != nil {
 						ec2svc.showConfirmationBox(err.Error(), false, nil)
