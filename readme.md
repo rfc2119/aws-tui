@@ -53,7 +53,7 @@ TODO: Contributing guide
 
 ## Support
 
-\#aws-tui on Freenode
+\#\#aws-tui on Freenode
 
 ## Acknowledgement
 
