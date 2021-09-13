@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/awserr"
+	// "github.com/aws/aws-sdk-go-v2/aws/awserr"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 )
 
@@ -227,16 +227,17 @@ func (mdl *EC2Model) CreateVolume(iops, size int64, volType, snapshotId, az stri
 // TODO: I don't understand yet why this is better than a simple print
 func printAWSError(err error) error {
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			default:
-				log.Println(aerr.Error())
-			}
-		} else {
-			// Print the error, cast err to awserr.Error to get the Code and
-			// Message from an error.
-			log.Println(err.Error())
-		}
+		log.Println(err.Error())
+		// if aerr, ok := err.(awserr.Error); ok {
+		// 	switch aerr.Code() {
+		// 	default:
+		// 		log.Println(aerr.Error())
+		// 	}
+		// } else {
+		// 	// Print the error, cast err to awserr.Error to get the Code and
+		// 	// Message from an error.
+		// 	log.Println(err.Error())
+		// }
 	}
 	return err
 }

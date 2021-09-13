@@ -8,7 +8,7 @@ import (
 	"github.com/rfc2119/aws-tui/ui"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/external"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/rivo/tview"
 )
 
@@ -41,7 +41,7 @@ func main() {
 	// Using the SDK's default configuration, loading additional config
 	// and credentials values from the environment variables, shared
 	// credentials, and shared configuration files
-	config, err := external.LoadDefaultAWSConfig()
+	awsMainConfig, err := config.LoadDefaultAWSConfig(context.TODO())
 	if err != nil {
 		panic("unable to load SDK config, " + err.Error())
 	}
@@ -52,9 +52,9 @@ func main() {
 	statusBar := ui.NewStatusBar()
 
 	// Services
-	ec2svc := ui.NewEC2Service(config, app, pages, statusBar)
+	ec2svc := ui.NewEC2Service(awsMainConfig, app, pages, statusBar)
 	ec2svc.InitView() // TODO: call only when user selects the service
-	iamsvc := ui.NewIAMService(config, app, pages, statusBar)
+	iamsvc := ui.NewIAMService(awsMainConfig, app, pages, statusBar)
 
 	// UI elements
 	mainContainer := tview.NewFlex() // Flex container for the status bar and application pages/window
@@ -100,7 +100,7 @@ func main() {
     Build Date:    %s
     SDK Name:      %7s
     SDK Version:   %-7s
-    `, *currentIAMUser.UserName, *currentIAMUser.Arn, config.Region, version, commit, date, aws.SDKName, aws.SDKVersion)
+    `, *currentIAMUser.UserName, *currentIAMUser.Arn, awsMainConfig.Region, version, commit, date, aws.SDKName, aws.SDKVersion)
 
 	// UI config
 	tree.SetRoot(rootNode)
