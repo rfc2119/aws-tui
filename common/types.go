@@ -268,7 +268,7 @@ var AWServicesDescriptions = map[int]awsServiceDescription{
 
 	ServiceElasticBlockStore: {
 		Name: "Amazon Elastic Block Store (EBS)", Description: "Scalable Storage in the Cloud", Available: false,
-	},		// Merged in the EC2 service for now
+	}, // Merged in the EC2 service for now
 
 	ServiceGlacier: {
 		Name: "Amazon Glacier", Description: "Low-Cost Archive Storage in the Cloud", Available: false,
@@ -558,7 +558,7 @@ var AWServicesDescriptions = map[int]awsServiceDescription{
 
 // map of sub items (tree children) names appearing at front page. this should be modeled as a tree object with children as tree nodes. this works for now
 var ServiceChildrenNames = map[int][]string{
-	ServiceEc2: []string{"Instances", "Volumes"},
+	ServiceEc2:                         []string{"Instances", "Volumes"},
 	ServiceIdentityAndAccessManagement: []string{"TODO"},
 }
 

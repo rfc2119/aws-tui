@@ -2,9 +2,9 @@ package ui
 
 import (
 	"fmt"
-	"log"
 	"github.com/rfc2119/aws-tui/common"
 	"github.com/rfc2119/aws-tui/model"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -86,20 +86,20 @@ As per the [documentation](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/m
 // global ui elements (TODO: perhaps i should make them local somehow)
 var (
 	// Instances page
-	instancesTable            = NewEtable()         // Instance table as in web UI
-	instancesFlex             *eFlex                // Container for the main page
+	tblInstances              = NewEtable()         // Instance table as in web UI
+	flexInstances             *eFlex                // Container for the main page
 	description               = tview.NewTextView() // Instance description
-	editInstancesGrid         *eGrid                // "Edit Instance" grid
+	gridEditInstances         *eGrid                // "Edit Instance" grid
 	instanceOfferingsDropdown = tview.NewDropDown() // Component in "Edit Instance"
 	instanceStatusRadioButton = NewRadioButtons([]string{
 		"Start", "Stop", "Stop (Force)", "Hibernate", "Reboot", "Terminate",
 	}) // all buttons are enabled by default. Component in "Edit Instance"
-	instancesTableAMI        = NewEtable() // Table used in AMI Filtering
+	tblInstancesAMI          = NewEtable() // Table used in AMI Filtering
 	EC2InstancesStateMachine = common.NewEC2InstancesStateMachine()
 
 	// Volumes page
-	volumesTable            = NewEtable()           // Main table for volumes
-	volumesFlex             *eFlex                  // Container for main page
+	tblVolumes              = NewEtable()           // Main table for volumes
+	flexVolumes             *eFlex                  // Container for main page
 	gridEditVolume          *eGrid                  // "Edit volumes" grid
 	dropDownVolumeType      = tview.NewDropDown()   // Component in "Edit volumes"
 	inputFieldVolumeSize    = tview.NewInputField() // Component in "Edit volumes"
@@ -107,7 +107,7 @@ var (
 	radioButtonVolumeStatus = NewRadioButtons([]string{
 		"Attach", "Detach", "Force Detach", "Delete",
 	}) // Component in "Edit volumes"
-	tableEditVolume                   = NewEtable()
+	tblEditVolume                     = NewEtable()
 	EBSVolumesStateMachine            = common.NewEBSVolumeStateMachine()
 	EBSVolumeModificationStateMachine = common.NewEBSVolumeModificationStateMachine()
 )
@@ -139,45 +139,45 @@ func NewEC2Service(config aws.Config, app *tview.Application, rootPage *ePages, 
 func (ec2svc *ec2Service) InitView() {
 
 	// Hacks
-	instancesFlex = NewEFlex(ec2svc.RootPage)
-	editInstancesGrid = NewEgrid(ec2svc.RootPage)
-	volumesFlex = NewEFlex(ec2svc.RootPage)
+	flexInstances = NewEFlex(ec2svc.RootPage)
+	gridEditInstances = NewEgrid(ec2svc.RootPage)
+	flexVolumes = NewEFlex(ec2svc.RootPage)
 	gridEditVolume = NewEgrid(ec2svc.RootPage)
 
 	ec2svc.drawElements()
 	ec2svc.setCallbacks()
 
 	// Configuration for ui elements
-	instancesTable.SetBorders(false)
-	instancesTable.SetSelectable(true, false) // rows: true, colums: false means select only rows
-	instancesTable.Select(1, 1)
-	instancesTable.SetFixed(0, 2)
+	tblInstances.SetBorders(false)
+	tblInstances.SetSelectable(true, false) // rows: true, colums: false means select only rows
+	tblInstances.Select(1, 1)
+	tblInstances.SetFixed(0, 2)
 
-	instancesFlex.HelpMessage = HELP_EC2_MAIN
-	instancesFlex.SetDirection(tview.FlexColumn)
-	instancesFlex.EAddItem(instancesTable, 0, 2, true)
-	instancesFlex.EAddItem(description, 0, 1, false)
+	flexInstances.HelpMessage = HELP_EC2_MAIN
+	flexInstances.SetDirection(tview.FlexColumn)
+	flexInstances.EAddItem(tblInstances, 0, 2, true)
+	flexInstances.EAddItem(description, 0, 1, false)
 
 	instanceStatusRadioButton.SetBorder(true).SetTitle("Status")
 	instanceOfferingsDropdown.SetLabel("Type")
-	editInstancesGrid.SetColumns(1, 0, 0, 1)
-	editInstancesGrid.SetRows(1, 10, 1)
-	editInstancesGrid.EAddItem(instanceStatusRadioButton, 1, 1, 1, 1, 0, 0, true)
-	editInstancesGrid.EAddItem(instanceOfferingsDropdown, 1, 2, 1, 1, 0, 0, false)
+	gridEditInstances.SetColumns(1, 0, 0, 1)
+	gridEditInstances.SetRows(1, 10, 1)
+	gridEditInstances.EAddItem(instanceStatusRadioButton, 1, 1, 1, 1, 0, 0, true)
+	gridEditInstances.EAddItem(instanceOfferingsDropdown, 1, 2, 1, 1, 0, 0, false)
 
-	instancesTableAMI.SetBorders(true)
-	instancesTableAMI.SetSelectable(true, false) // rows: true, colums: false means select only rows
-	instancesTableAMI.Select(1, 1)
-	instancesTableAMI.SetFixed(1, 1)
+	tblInstancesAMI.SetBorders(true)
+	tblInstancesAMI.SetSelectable(true, false) // rows: true, colums: false means select only rows
+	tblInstancesAMI.Select(1, 1)
+	tblInstancesAMI.SetFixed(1, 1)
 
-	volumesTable.SetBorders(false)
-	volumesTable.SetSelectable(true, false) // rows: true, colums: false means select only rows
-	volumesTable.Select(1, 1)
-	volumesTable.SetFixed(0, 2)
+	tblVolumes.SetBorders(false)
+	tblVolumes.SetSelectable(true, false) // rows: true, colums: false means select only rows
+	tblVolumes.Select(1, 1)
+	tblVolumes.SetFixed(0, 2)
 
-	volumesFlex.HelpMessage = HELP_EBS_MAIN
-	volumesFlex.SetDirection(tview.FlexColumn)
-	volumesFlex.EAddItem(volumesTable, 0, 1, true)
+	flexVolumes.HelpMessage = HELP_EBS_MAIN
+	flexVolumes.SetDirection(tview.FlexColumn)
+	flexVolumes.EAddItem(tblVolumes, 0, 1, true)
 
 	inputFieldVolumeIops.SetLabel("IOPS").SetFieldWidth(5)
 	inputFieldVolumeSize.SetLabel("Size (GiB)").SetFieldWidth(5)
@@ -190,10 +190,10 @@ func (ec2svc *ec2Service) InitView() {
 	// gridEditVolume.SetBorders(true).SetBorder(true).SetTitle("Test").SetTitleAlign(tview.AlignCenter)
 	gridEditVolume.SetBorders(true)
 
-	tableEditVolume.SetBorders(false)
-	tableEditVolume.SetSelectable(true, false)
-	tableEditVolume.Select(1, 1)
-	tableEditVolume.SetFixed(0, 2)
+	tblEditVolume.SetBorders(false)
+	tblEditVolume.SetSelectable(true, false)
+	tblEditVolume.Select(1, 1)
+	tblEditVolume.SetFixed(0, 2)
 
 	gridEditVolume.HelpMessage = HELP_EBS_EDIT_VOL
 	gridEditVolume.SetRows(2, 2, 2, 0)
@@ -202,11 +202,11 @@ func (ec2svc *ec2Service) InitView() {
 	gridEditVolume.EAddItem(inputFieldVolumeSize, 1, 0, 1, 2, 0, 0, false)
 	gridEditVolume.EAddItem(inputFieldVolumeIops, 2, 0, 1, 2, 0, 0, false)
 	gridEditVolume.EAddItem(radioButtonVolumeStatus, 0, 2, 3, 1, 0, 0, false)
-	gridEditVolume.EAddItem(tableEditVolume, 3, 0, 1, 3, 20, 40, false)
+	gridEditVolume.EAddItem(tblEditVolume, 3, 0, 1, 3, 20, 40, false)
 	ec2svc.mainUI.enableShiftingFocus(gridEditVolume.layoutContainer)
 
-	ec2svc.RootPage.EAddPage("Instances", instancesFlex, true, false) // TODO: page names and such; resize=true, visible=false
-	ec2svc.RootPage.EAddPage("Volumes", volumesFlex, true, false)     // TODO: page names and such; resize=true, visible=false
+	ec2svc.RootPage.EAddPage("Instances", flexInstances, true, false) // TODO: page names and such; resize=true, visible=false
+	ec2svc.RootPage.EAddPage("Volumes", flexVolumes, true, false)     // TODO: page names and such; resize=true, visible=false
 
 	ec2svc.WatchChanges()
 	ec2svc.setDropDownsCallbacks()
@@ -239,40 +239,40 @@ func (ec2svc *ec2Service) drawElements() {
 // Set function callbacks for different ui elements
 func (ec2svc *ec2Service) setCallbacks() {
 
-	// instancesTable
-	instancesTableCallbacks := map[tcell.Key]func(){
+	// tblInstances
+	tblInstancesCallbacks := map[tcell.Key]func(){
 		tcell.Key('d'): func() {
-			row, _ := instancesTable.GetSelection() // TODO: multi selection
+			row, _ := tblInstances.GetSelection() // TODO: multi selection
 			description.SetText(fmt.Sprintf("%v", ec2svc.instances[row-1]))
 		},
 		tcell.Key('e'): func() {
 			// Configuring the state radio button
-			row, _ := instancesTable.GetSelection() // TODO: multi selection
-			state := ssm.State{Name: instancesTable.GetCell(row, COL_EC2_STATE).Text}
+			row, _ := tblInstances.GetSelection() // TODO: multi selection
+			state := ssm.State{Name: tblInstances.GetCell(row, COL_EC2_STATE).Text}
 			if err := EC2InstancesStateMachine.GoToState(state, false); err != nil {
 				ec2svc.StatusBar.SetText(err.Error())
 				return
 			}
 			configureRadioButton(instanceStatusRadioButton, EC2InstancesStateMachine)
 			// TODO: configure the "instance type" drop down
-			// editInstancesGrid.SetTitle(instancesTable.GetCell(row, COL_EC2_ID).Text) //TODO
-			ec2svc.showGenericModal(editInstancesGrid, 40, 80, true)
+			// gridEditInstances.SetTitle(tblInstances.GetCell(row, COL_EC2_ID).Text) //TODO
+			ec2svc.showGenericModal(gridEditInstances, 40, 80, true)
 		},
 		tcell.Key('r'): func() {
 			ec2svc.StatusBar.SetText("refreshing instances list")
 			fillInstancesTable(ec2svc)
 		},
 	}
-	instancesTable.UpdateKeyToFunc(instancesTableCallbacks)
+	tblInstances.UpdateKeyToFunc(tblInstancesCallbacks)
 
-	// instancesFlex container for EC2 instances table
+	// flexInstances container for EC2 instances table
 	instancesFlexCallBacks := map[tcell.Key]func(){
 		tcell.KeyCtrlL: func() { chooseAMIFilters(ec2svc) },
 	}
-	ec2svc.mainUI.enableShiftingFocus(instancesFlex.layoutContainer)
-	instancesFlex.UpdateKeyToFunc(instancesFlexCallBacks)
+	ec2svc.mainUI.enableShiftingFocus(flexInstances.layoutContainer)
+	flexInstances.UpdateKeyToFunc(instancesFlexCallBacks)
 
-	ec2svc.mainUI.enableShiftingFocus(editInstancesGrid.layoutContainer)
+	ec2svc.mainUI.enableShiftingFocus(gridEditInstances.layoutContainer)
 
 	// Radio button for instance status
 	instanceStatusRadioButtonCallBacks := map[tcell.Key]func(){
@@ -280,8 +280,8 @@ func (ec2svc *ec2Service) setCallbacks() {
 			currOpt := instanceStatusRadioButton.GetCurrentOptionName()
 			msg := fmt.Sprintf("%s instance ?", currOpt)
 			ec2svc.showConfirmationBox(msg, true, func() {
-				row, _ := instancesTable.GetSelection() // TODO: multi selection
-				instanceIds := []string{instancesTable.GetCell(row, COL_EC2_ID).Text}
+				row, _ := tblInstances.GetSelection() // TODO: multi selection
+				instanceIds := []string{tblInstances.GetCell(row, COL_EC2_ID).Text}
 				switch currOpt { // TODO: do something w/ return value
 				case "Start": // TODO: magic names
 					if _, err := ec2svc.Model.StartEC2Instances(instanceIds); err != nil {
@@ -331,53 +331,53 @@ func (ec2svc *ec2Service) setCallbacks() {
 	instanceOfferingsDropdown.SetSelectedFunc(func(text string, index int) {
 		msg := fmt.Sprintf("Change instance type to %s ?", text)
 		ec2svc.showConfirmationBox(msg, true, func() {
-			row, _ := instancesTable.GetSelection()
-			if instancesTable.GetCell(row, COL_EC2_STATE).Text != "stopped" {
+			row, _ := tblInstances.GetSelection()
+			if tblInstances.GetCell(row, COL_EC2_STATE).Text != "stopped" {
 				ec2svc.StatusBar.SetText("Cannot change instance type: instance is not in the stopped state")
 				return
 			}
-			if err := ec2svc.Model.ChangeInstanceType(instancesTable.GetCell(row, COL_EC2_ID).Text, text); err != nil {
+			if err := ec2svc.Model.ChangeInstanceType(tblInstances.GetCell(row, COL_EC2_ID).Text, text); err != nil {
 				ec2svc.showConfirmationBox(err.Error(), false, nil) // TODO: spread
 				ec2svc.StatusBar.SetText(err.Error())
 			}
 		})
 	})
 
-	volumesTableCallBacks := map[tcell.Key]func(){
+	tblVolumesCallBacks := map[tcell.Key]func(){
 		tcell.Key('r'): func() { fillVolumesTable(ec2svc) },
 		tcell.Key('c'): func() { createVolume(ec2svc) },
 		tcell.Key('e'): func() {
 			// Configuring the state radio button
-			row, _ := volumesTable.GetSelection()
-			state := ssm.State{Name: volumesTable.GetCell(row, COL_EBS_STATE).Text}
+			row, _ := tblVolumes.GetSelection()
+			state := ssm.State{Name: tblVolumes.GetCell(row, COL_EBS_STATE).Text}
 			if err := EBSVolumesStateMachine.GoToState(state, false); err != nil {
 				ec2svc.StatusBar.SetText(err.Error())
 				return
 			}
 			configureRadioButton(radioButtonVolumeStatus, EBSVolumesStateMachine)
-			if iops := volumesTable.GetCell(row, COL_EBS_IOPS).Text; iops != "0" {
+			if iops := tblVolumes.GetCell(row, COL_EBS_IOPS).Text; iops != "0" {
 				inputFieldVolumeIops.SetFieldWidth(5)
 				inputFieldVolumeIops.SetText(iops)
 			} else {
 				inputFieldVolumeIops.SetFieldWidth(-1) // Awful hack to disable the input field
 			} // No IOPS for magnetic HDDs
-			inputFieldVolumeSize.SetText(volumesTable.GetCell(row, COL_EBS_SIZE).Text)
+			inputFieldVolumeSize.SetText(tblVolumes.GetCell(row, COL_EBS_SIZE).Text)
 			// dropDownVolumeType.SetIndex()       // TODO
 			fillTableEditVolume(ec2svc)
 			ec2svc.showGenericModal(gridEditVolume, 50, 30, true)
 		},
 	}
-	volumesTable.UpdateKeyToFunc(volumesTableCallBacks)
+	tblVolumes.UpdateKeyToFunc(tblVolumesCallBacks)
 	radioButtonVolumeStatusCallbacks := map[tcell.Key]func(){
 		tcell.Key(' '): func() {
 			currOpt := radioButtonVolumeStatus.GetCurrentOptionName()
 			msg := fmt.Sprintf("%s volume ?", currOpt)
 			ec2svc.showConfirmationBox(msg, true, func() {
-				row, _ := tableEditVolume.GetSelection()
-				detachedInstanceId := tableEditVolume.GetCell(row, COL_EBS_VOL_INSTANCE_ID).Text
-				detachedDeviceName := tableEditVolume.GetCell(row, COL_EBS_VOL_DEVICE_NAME).Text
-				row, _ = volumesTable.GetSelection()
-				volId := volumesTable.GetCell(row, COL_EBS_ID).Text
+				row, _ := tblEditVolume.GetSelection()
+				detachedInstanceId := tblEditVolume.GetCell(row, COL_EBS_VOL_INSTANCE_ID).Text
+				detachedDeviceName := tblEditVolume.GetCell(row, COL_EBS_VOL_DEVICE_NAME).Text
+				row, _ = tblVolumes.GetSelection()
+				volId := tblVolumes.GetCell(row, COL_EBS_ID).Text
 				az := aws.StringValue(ec2svc.volumes[row-1].AvailabilityZone)
 				switch currOpt {
 				case "Attach":
@@ -446,14 +446,14 @@ func (ec2svc *ec2Service) setCallbacks() {
 	radioButtonVolumeStatus.UpdateKeyToFunc(radioButtonVolumeStatusCallbacks)
 
 	// The flex container holding the volumes table
-	ec2svc.mainUI.enableShiftingFocus(volumesFlex.layoutContainer)
+	ec2svc.mainUI.enableShiftingFocus(flexVolumes.layoutContainer)
 
 	// The table for listing attached EC2 instances to EBS volumes
-	tableEditVolume.SetSelectionChangedFunc(func(row, col int) {
+	tblEditVolume.SetSelectionChangedFunc(func(row, col int) {
 		if row <= 1 {
 			return
 		}
-		state := ssm.State{Name: volumesTable.GetCell(row, COL_EBS_STATE).Text}
+		state := ssm.State{Name: tblVolumes.GetCell(row, COL_EBS_STATE).Text}
 		if err := EBSVolumesStateMachine.GoToState(state, false); err != nil {
 			ec2svc.StatusBar.SetText(err.Error())
 			return
@@ -462,8 +462,8 @@ func (ec2svc *ec2Service) setCallbacks() {
 	})
 	inputFieldVolumeIops.SetDoneFunc(func(key tcell.Key) {
 		if key == tcell.KeyEnter {
-			row, _ := volumesTable.GetSelection()
-			oldIops := volumesTable.GetCell(row, COL_EBS_IOPS).Text
+			row, _ := tblVolumes.GetSelection()
+			oldIops := tblVolumes.GetCell(row, COL_EBS_IOPS).Text
 			newIops := inputFieldVolumeIops.GetText()
 			if oldIops != newIops { // TODO: should new IOPS be > old IOPS ?
 				var (
@@ -471,7 +471,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 					err  error
 				)
 				msg := fmt.Sprintf("Change volume IOPS from %s to %s ?", oldIops, newIops)
-				volId := volumesTable.GetCell(row, COL_EBS_ID).Text
+				volId := tblVolumes.GetCell(row, COL_EBS_ID).Text
 				if iops, err = strconv.ParseInt(newIops, 10, 64); err != nil {
 					ec2svc.StatusBar.SetText("numerical conversion error") // TODO: logging
 					return
@@ -492,8 +492,8 @@ func (ec2svc *ec2Service) setCallbacks() {
 				oldSize, newSize int64
 				err              error
 			)
-			row, _ := volumesTable.GetSelection()
-			if oldSize, err = strconv.ParseInt(volumesTable.GetCell(row, COL_EBS_SIZE).Text, 10, 64); err != nil {
+			row, _ := tblVolumes.GetSelection()
+			if oldSize, err = strconv.ParseInt(tblVolumes.GetCell(row, COL_EBS_SIZE).Text, 10, 64); err != nil {
 				log.Println("numerical conversion error")
 				return
 			}
@@ -503,7 +503,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 			}
 			if newSize > oldSize {
 				msg := fmt.Sprintf("Change volume size from %d to %d ?", oldSize, newSize)
-				volId := volumesTable.GetCell(row, COL_EBS_ID).Text
+				volId := tblVolumes.GetCell(row, COL_EBS_ID).Text
 				ec2svc.showConfirmationBox(msg, true, func() {
 					if _, err := ec2svc.Model.ModifyVolume(-1, newSize, "", volId); err != nil {
 						ec2svc.showConfirmationBox(err.Error(), true, nil)
@@ -520,20 +520,20 @@ func (ec2svc *ec2Service) setCallbacks() {
 func (ec2svc *ec2Service) setDropDownsCallbacks() {
 
 	dropDownVolumeType.SetSelectedFunc(func(newType string, index int) {
-		row, _ := volumesTable.GetSelection()
-		oldType := volumesTable.GetCell(row, COL_EBS_TYPE).Text
+		row, _ := tblVolumes.GetSelection()
+		oldType := tblVolumes.GetCell(row, COL_EBS_TYPE).Text
 		if oldType != newType {
 			var (
 				iops int64 = -1
 				size int64
 				err  error
 			)
-			if size, err = strconv.ParseInt(volumesTable.GetCell(row, COL_EBS_SIZE).Text, 10, 64); err != nil {
+			if size, err = strconv.ParseInt(tblVolumes.GetCell(row, COL_EBS_SIZE).Text, 10, 64); err != nil {
 				ec2svc.StatusBar.SetText("numerical conversion error")
 				return
 			}
 			msg := fmt.Sprintf("Change volume type from %s to %s ?", oldType, newType)
-			volId := volumesTable.GetCell(row, COL_EBS_ID).Text
+			volId := tblVolumes.GetCell(row, COL_EBS_ID).Text
 			switch newType {
 			case "io1", "io2":
 				// Min: 100 IOPS, Max: 64000 IOPS
@@ -624,16 +624,16 @@ func listener1(action common.Action) {
 	)
 	statuses := action.Data.([]ec2.InstanceStatus)
 	for _, status := range statuses {
-		if rowIdx = rowIndexFromTable(instancesTable, stringFromAWSVar(status.InstanceId)); rowIdx == -1 {
+		if rowIdx = rowIndexFromTable(tblInstances, stringFromAWSVar(status.InstanceId)); rowIdx == -1 {
 			continue
 		}
 		newStateText := stringFromAWSVar(status.InstanceState.Name)
-		row := hopToStateAndColorizeRowInTable(instancesTable, rowIdx, COL_EC2_STATE, newStateText, EC2InstancesStateMachine)
+		row := hopToStateAndColorizeRowInTable(tblInstances, rowIdx, COL_EC2_STATE, newStateText, EC2InstancesStateMachine)
 		if row != -1 {
 			indicesColoredRows = append(indicesColoredRows, row)
 		}
 	}
-	clearRowsColor(instancesTable, indicesColoredRows, 3)
+	clearRowsColor(tblInstances, indicesColoredRows, 3)
 }
 
 // Listner for watcher2. Checks if a volume was recently modified and updates the UI
@@ -644,12 +644,12 @@ func listener2(action common.Action) {
 	)
 	modifications := action.Data.([]ec2.VolumeModification)
 	for _, mod := range modifications {
-		if rowIdx = rowIndexFromTable(volumesTable, aws.StringValue(mod.VolumeId)); rowIdx == -1 {
+		if rowIdx = rowIndexFromTable(tblVolumes, aws.StringValue(mod.VolumeId)); rowIdx == -1 {
 			continue
 		}
-		iopsCell := volumesTable.GetCell(rowIdx, COL_EBS_IOPS)
-		sizeCell := volumesTable.GetCell(rowIdx, COL_EBS_SIZE)
-		volTypeCell := volumesTable.GetCell(rowIdx, COL_EBS_TYPE)
+		iopsCell := tblVolumes.GetCell(rowIdx, COL_EBS_IOPS)
+		sizeCell := tblVolumes.GetCell(rowIdx, COL_EBS_SIZE)
+		volTypeCell := tblVolumes.GetCell(rowIdx, COL_EBS_TYPE)
 		if iopsCell.Text != stringFromAWSVar(mod.TargetIops) ||
 			sizeCell.Text != stringFromAWSVar(mod.TargetSize) ||
 			volTypeCell.Text != stringFromAWSVar(mod.TargetVolumeType) {
@@ -660,16 +660,16 @@ func listener2(action common.Action) {
 			}
 		}
 		newStateText := stringFromAWSVar(mod.ModificationState)
-		row := hopToStateAndColorizeRowInTable(volumesTable, rowIdx, COL_EBS_MODIFICATION_STATE, newStateText, EBSVolumeModificationStateMachine)
+		row := hopToStateAndColorizeRowInTable(tblVolumes, rowIdx, COL_EBS_MODIFICATION_STATE, newStateText, EBSVolumeModificationStateMachine)
 		if row != -1 {
 			indicesColoredRows = append(indicesColoredRows, row)
 		}
 	}
-	clearRowsColor(volumesTable, indicesColoredRows, 3)
+	clearRowsColor(tblVolumes, indicesColoredRows, 3)
 }
 
 // ============ helper functions
-// Given an instance ID, return the row index of the instance in instancesTable t
+// Given an instance ID, return the row index of the instance in tblInstances t
 func rowIndexFromTable(t *eTable, instanceID string) int {
 	idx := -1
 	for rowIdx := 1; rowIdx < t.GetRowCount(); rowIdx++ { // 1 because first row is for column labels
@@ -682,7 +682,7 @@ func rowIndexFromTable(t *eTable, instanceID string) int {
 	return idx
 }
 
-// Colorize a row in a given instancesTable
+// Colorize a row in a given tblInstances
 func colorizeRowInTable(t *eTable, row int, color tcell.Color) {
 	for col := 0; col < t.GetColumnCount(); col++ {
 		t.GetCell(row, col).SetBackgroundColor(color)
@@ -748,18 +748,18 @@ func configureRadioButton(rButton *RadioButtons, sm *common.EStateMachine) {
 // TODO: generalize table drawing
 // Fills the table attached instances to EBS volumes
 func fillTableEditVolume(ec2svc *ec2Service) {
-	row, _ := volumesTable.GetSelection()
+	row, _ := tblVolumes.GetSelection()
 	attachments := ec2svc.volumes[row-1].Attachments
 	// if len(attachments) == 0 { // Clear table
-	tableEditVolume.Clear()
-	drawFirstRowTable(tableEditVolume)
+	tblEditVolume.Clear()
+	drawFirstRowTable(tblEditVolume)
 	// 	return
 	// }
 	for rowIdx, info := range attachments {
 		items := []interface{}{info.InstanceId, info.State, info.Device, info.AttachTime}
 		for colIdx, item := range items {
 			cell := tview.NewTableCell(stringFromAWSVar(item)).SetAlign(tview.AlignCenter)
-			tableEditVolume.SetCell(rowIdx+1, colIdx, cell)
+			tblEditVolume.SetCell(rowIdx+1, colIdx, cell)
 		}
 	}
 }
@@ -772,15 +772,15 @@ func fillVolumesTable(ec2svc *ec2Service) {
 		ec2svc.showConfirmationBox(err.Error(), true, nil)
 	}
 	// if len(ec2svc.volumes) == 0 { // Clear table
-	volumesTable.Clear()
-	drawFirstRowTable(volumesTable)
+	tblVolumes.Clear()
+	drawFirstRowTable(tblVolumes)
 	// 	return
 	// }
 	for rowIdx, volume := range ec2svc.volumes {
 		items := []interface{}{volume.VolumeId, volume.Size, volume.VolumeType, volume.Iops, volume.State, ""}
 		for colIdx, item := range items { // "" = 'modification state'
 			cell := tview.NewTableCell(stringFromAWSVar(item)).SetAlign(tview.AlignCenter)
-			volumesTable.SetCell(rowIdx+1, colIdx, cell)
+			tblVolumes.SetCell(rowIdx+1, colIdx, cell)
 		}
 	}
 }
@@ -794,15 +794,15 @@ func fillInstancesTable(ec2svc *ec2Service) {
 		ec2svc.showConfirmationBox(err.Error(), true, nil)
 	}
 	// if len(ec2svc.instances) == 0 { // Clear table
-	instancesTable.Clear()
-	drawFirstRowTable(instancesTable)
+	tblInstances.Clear()
+	drawFirstRowTable(tblInstances)
 	// 	return
 	// }
 	for rowIdx, instance := range ec2svc.instances {
 		items := []interface{}{instance.InstanceId, instance.ImageId, instance.InstanceType, instance.State.Name}
 		for colIdx, item := range items {
 			cell := tview.NewTableCell(stringFromAWSVar(item)).SetAlign(tview.AlignCenter)
-			instancesTable.SetCell(rowIdx+1, colIdx, cell)
+			tblInstances.SetCell(rowIdx+1, colIdx, cell)
 		}
 	}
 }
@@ -810,10 +810,10 @@ func fillInstancesTable(ec2svc *ec2Service) {
 // Draws the first row for specific table, or all tables if no table was provided
 func drawFirstRowTable(t *eTable) { // Hardcoded all the way (TODO?)
 	tableToColNames := map[*eTable][]string{
-		tableEditVolume:   []string{"Instance ID", "State", "Device", "Date Attached"},
-		volumesTable:      []string{"ID", "Size (GiB)", "Type", "IOPS", "State", "Modification State"},
-		instancesTable:    []string{"ID", "AMI", "Type", "State"},
-		instancesTableAMI: []string{"ID", "State", "Arch", "Creation Date", "Name", "Owner ID"},
+		tblEditVolume:   []string{"Instance ID", "State", "Device", "Date Attached"},
+		tblVolumes:      []string{"ID", "Size (GiB)", "Type", "IOPS", "State", "Modification State"},
+		tblInstances:    []string{"ID", "AMI", "Type", "State"},
+		tblInstancesAMI: []string{"ID", "State", "Arch", "Creation Date", "Name", "Owner ID"},
 	}
 	drawRowFunc := func(table *eTable, colNames []string) {
 		for firstColIdx := 0; firstColIdx < len(colNames); firstColIdx++ {
@@ -892,10 +892,10 @@ func chooseAMIFilters(ec2svc *ec2Service) {
 			items := []interface{}{ami.ImageId, ami.State, ami.Architecture, ami.CreationDate, ami.Name, ami.OwnerId}
 			for colIdx, item := range items {
 				cell := tview.NewTableCell(stringFromAWSVar(item))
-				instancesTableAMI.SetCell(rowIdx+1, colIdx, cell)
+				tblInstancesAMI.SetCell(rowIdx+1, colIdx, cell)
 			}
 		}
-		ec2svc.RootPage.AddAndSwitchToPage("AMIs", instancesTableAMI, true)
+		ec2svc.RootPage.AddAndSwitchToPage("AMIs", tblInstancesAMI, true)
 	}
 
 	inputField = tview.NewInputField().SetLabel("Filter Value")
