@@ -25,10 +25,17 @@ func NewIAModel(config aws.Config) *IAModel {
 	}
 }
 
-func (mdl *IAModel) GetCurrentUserInfo() *types.User {
+func (mdl *IAModel) GetCurrentUserInfo() (*types.User, error) {
+	// ValidationError: Must specify userName when calling with non-User credentials
+	// Assume the principal is an IAM user
 	resp, err := mdl.model.GetUser(context.TODO(), &iam.GetUserInput{})
 	if err != nil {
-		log.Println(err)
+		log.Printf("principal is not an IAM user: %s", err)
+		// pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/sts#Client.GetCallerIdentity
+		// TODO: Assume principal is an IAM role
+		// TODO: get more information about the principal
+		todoString := aws.String("TODO")
+		return &types.User{UserName: todoString, Arn: todoString}, err
 	}
-	return resp.User
+	return resp.User, err
 }

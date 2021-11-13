@@ -90,19 +90,22 @@ func main() {
 	})
 
 	// Filling the info box with initial values
-	currentIAMUser := iamsvc.Model.GetCurrentUserInfo()
-	fmt.Fprintf(info,
-		`
-    IAM User name: %7s
-    IAM User arn:  %20s
-    Region:        %7s
+	if currentIAMUser, err := iamsvc.Model.GetCurrentUserInfo(); err != nil {
+		fmt.Println(fmt.Errorf("error getting user info: %s", err))
+	} else {
+		fmt.Fprintf(info,
+			`
+			IAM User name: %7s
+			IAM User arn:  %20s
+			Region:        %7s
 
-    Build Version: %s
-    Build Commit:  %s
-    Build Date:    %s
-    SDK Name:      %7s
-    SDK Version:   %-7s
-    `, *currentIAMUser.UserName, *currentIAMUser.Arn, awsMainConfig.Region, version, commit, date, aws.SDKName, aws.SDKVersion)
+			Build Version: %s
+			Build Commit:  %s
+			Build Date:    %s
+			SDK Name:      %7s
+			SDK Version:   %-7s
+			`, *currentIAMUser.UserName, *currentIAMUser.Arn, awsMainConfig.Region, version, commit, date, aws.SDKName, aws.SDKVersion)
+	}
 
 	// UI config
 	tree.SetRoot(rootNode)
