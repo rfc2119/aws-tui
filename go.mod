@@ -14,8 +14,9 @@ require (
 	github.com/rfc2119/simple-state-machine v0.0.0-20200921151301-9684ead3565f
 	github.com/rivo/tview v0.0.0-20200915114512-42866ecf6ca6
 	github.com/stretchr/testify v1.6.1
-	golang.org/x/sys v0.0.0-20200918174421-af09f7315aff // indirect
-	golang.org/x/text v0.3.3 // indirect
+	golang.org/x/sys v0.0.0-20210510120138-977fb7262007 // indirect
+	golang.org/x/text v0.3.6 // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200605160147-a5ece683394c // indirect
 )
