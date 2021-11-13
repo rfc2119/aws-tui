@@ -3,12 +3,14 @@ package main
 import (
 	// "context"        // TODO
 	// "runtime/debug"
+	"context"
 	"fmt"
+
 	"github.com/rfc2119/aws-tui/common"
 	"github.com/rfc2119/aws-tui/ui"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/external"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/rivo/tview"
 )
 
@@ -18,11 +20,11 @@ Welcome to the unofficial AWS Terminal Interface. This is a very much work-in-pr
 
 Common keys found across all windows:
 
-	TAB             Move to neighboring windows
-	?               View help messages (if available)
-	q               Move back one page (will exit this help message)
-    Space           Select Option in a radio box/tree view (except in a confirmation box)
-    hjkl		Movement keys
+	TAB      Move to neighboring windows
+	?        View help messages (if available)
+	q        Move back one page (will exit this help message)
+  Space    Select Option in a radio box/tree view (except in a confirmation box)
+  hjkl     Movement keys
 
 There's likely a help page for every window, so please use '?' when in doubt. Use Ctrl-C to exit the application.
 `
@@ -41,7 +43,7 @@ func main() {
 	// Using the SDK's default configuration, loading additional config
 	// and credentials values from the environment variables, shared
 	// credentials, and shared configuration files
-	config, err := external.LoadDefaultAWSConfig()
+	awsMainConfig, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		panic("unable to load SDK config, " + err.Error())
 	}
@@ -52,15 +54,15 @@ func main() {
 	statusBar := ui.NewStatusBar()
 
 	// Services
-	ec2svc := ui.NewEC2Service(config, app, pages, statusBar)
+	ec2svc := ui.NewEC2Service(awsMainConfig, app, pages, statusBar)
 	ec2svc.InitView() // TODO: call only when user selects the service
-	iamsvc := ui.NewIAMService(config, app, pages, statusBar)
+	iamsvc := ui.NewIAMService(awsMainConfig, app, pages, statusBar)
 
 	// UI elements
 	mainContainer := tview.NewFlex() // Flex container for the status bar and application pages/window
 	frontPage := ui.NewEFlex(pages)  // The front page which holds the info and tree view
-	info := tview.NewTextView()	// The side bar informational view
-	tree := tview.NewTreeView()	// The menu holding all available services
+	info := tview.NewTextView()      // The side bar informational view
+	tree := tview.NewTreeView()      // The menu holding all available services
 
 	// Filling the tree with initial values
 	rootNode := tview.NewTreeNode("Services")
@@ -88,19 +90,22 @@ func main() {
 	})
 
 	// Filling the info box with initial values
-	currentIAMUser := iamsvc.Model.GetCurrentUserInfo()
-	fmt.Fprintf(info,
-		`
-    IAM User name: %7s
-    IAM User arn:  %20s
-    Region:        %7s
+	if currentIAMUser, err := iamsvc.Model.GetCurrentUserInfo(); err != nil {
+		fmt.Println(fmt.Errorf("error getting user info: %s", err))
+	} else {
+		fmt.Fprintf(info,
+			`
+			IAM User name: %7s
+			IAM User arn:  %20s
+			Region:        %7s
 
-    Build Version: %s
-    Build Commit:  %s
-    Build Date:    %s
-    SDK Name:      %7s
-    SDK Version:   %-7s
-    `, *currentIAMUser.UserName, *currentIAMUser.Arn, config.Region, version, commit, date, aws.SDKName, aws.SDKVersion)
+			Build Version: %s
+			Build Commit:  %s
+			Build Date:    %s
+			SDK Name:      %7s
+			SDK Version:   %-7s
+			`, *currentIAMUser.UserName, *currentIAMUser.Arn, awsMainConfig.Region, version, commit, date, aws.SDKName, aws.SDKVersion)
+	}
 
 	// UI config
 	tree.SetRoot(rootNode)

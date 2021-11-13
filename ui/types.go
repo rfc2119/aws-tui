@@ -548,16 +548,16 @@ func stringFromAWSVar(awsVar interface{}) string {
 	var t string
 	switch v := awsVar.(type) {
 	case *string:
-		t = aws.StringValue(v)
+		t = aws.ToString(v)
 	case *int:
-		t = fmt.Sprint(aws.IntValue(v)) // hmmmm
+		t = fmt.Sprint(aws.ToInt(v)) // hmmmm
 	case *int64:
 		// go vet being helpful as always:
 		// conversion from int to string yields a string of one rune,
 		// not a string of digits (did you mean fmt.Sprint(x)?)
-		t = fmt.Sprint(aws.Int64Value(v)) // hmmmm
+		t = fmt.Sprint(aws.ToInt64(v)) // hmmmm
 	case *time.Time:
-		t = fmt.Sprint(aws.TimeValue(v))
+		t = fmt.Sprint(aws.ToTime(v))
 	default:
 		switch reflect.TypeOf(v).Kind() {
 		case reflect.String: // should be a type derived from string ?
