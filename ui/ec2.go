@@ -7,11 +7,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/rfc2119/aws-tui/common"
 	"github.com/rfc2119/aws-tui/model"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/ec2/types" // TODO: should probably remove this
+	"github.com/aws/aws-sdk-go-v2/service/ec2" // TODO: should probably remove this
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/gdamore/tcell"
 	ssm "github.com/rfc2119/simple-state-machine"
 	"github.com/rivo/tview"
@@ -47,12 +49,12 @@ const (
 const (
 	HELP_EC2_MAIN = `
 	d               Describe instance
-    r               Manually refresh list of instances
+  r               Manually refresh list of instances
 	e               Edit instance (WIP)
-    ^l              Filter and List AMIs
+  ^l              Filter and List AMIs
 	`
 	HELP_EBS_MAIN = `
-    r               Refresh list of volumes
+  r               Refresh list of volumes
 	e               Edit volume
 	c		Create a new volume
 	`
@@ -244,7 +246,8 @@ func (ec2svc *ec2Service) setCallbacks() {
 	tblInstancesCallbacks := map[tcell.Key]func(){
 		tcell.Key('d'): func() {
 			row, _ := tblInstances.GetSelection() // TODO: multi selection
-			description.SetText(fmt.Sprintf("%v", ec2svc.instances[row-1]))
+			// description.SetText(fmt.Sprintf("%v", ec2svc.instances[row-1]))
+			description.SetText(spew.Sdump(ec2svc.instances[row-1])) // TODO
 		},
 		tcell.Key('e'): func() {
 			// Configuring the state radio button
@@ -977,7 +980,7 @@ func createVolume(ec2svc *ec2Service) {
 		isMultiAttached := checkBoxMultiAttach.IsChecked()
 		if newVolume, err := ec2svc.Model.CreateVolume(int32(iops), int32(size), volType, snapshotId, az, isEncrypted, isMultiAttached); err == nil {
 			ec2svc.StatusBar.SetText(fmt.Sprintf("Creating EBS Volume with ID %s. Refresh the list of volumes", stringFromAWSVar(newVolume.VolumeId)))
-			ec2svc.volumes = append(ec2svc.volumes, types.Volume(newVolume)) // TODO: do that as well in other methods
+			ec2svc.volumes = append(ec2svc.volumes, createVolumeOutputToVolume(newVolume)) // TODO: do that as well in other methods
 			ec2svc.RootPage.ESwitchToPreviousPage()
 			return
 		}
@@ -995,4 +998,64 @@ func createVolume(ec2svc *ec2Service) {
 	form.AddButton("Cancel", buttonCancelFunc)
 	form.SetTitle("Create a new EBS Volume").SetBorder(true)
 	ec2svc.showGenericModal(form, 40, 20, true) // 40x20 seems good for my screen
+}
+
+func createVolumeOutputToVolume(createVolumeOutput ec2.CreateVolumeOutput) types.Volume {
+	// Both types createVolumeOutput and types.Volume had the same signature
+	// After breaking changes in the SDK, an additional field was added to createVolumeOutput
+	// This function converts a CreateVolumeOutput to types.Volume type
+	// TODO: this should be removed
+	return types.Volume{
+		// Information about the volume attachments.
+		Attachments: createVolumeOutput.Attachments,
+
+		// The Availability Zone for the volume.
+		AvailabilityZone: createVolumeOutput.AvailabilityZone,
+
+		// The time stamp when volume creation was initiated.
+		CreateTime: createVolumeOutput.CreateTime,
+
+		// Indicates whether the volume is encrypted.
+		Encrypted: createVolumeOutput.Encrypted,
+
+		// Indicates whether the volume was created using fast snapshot restore.
+		FastRestored: createVolumeOutput.FastRestored,
+
+		// The number of I/O operations per second (IOPS). For gp3, io1, and io2 volumes,
+		// this represents the number of IOPS that are provisioned for the volume. For gp2
+		// volumes, this represents the baseline performance of the volume and the rate at
+		// which the volume accumulates I/O credits for bursting.
+		Iops: createVolumeOutput.Iops,
+
+		// The Amazon Resource Name (ARN) of the Key Management Service (KMS) KMS key that
+		// was used to protect the volume encryption key for the volume.
+		KmsKeyId: createVolumeOutput.KmsKeyId,
+
+		// Indicates whether Amazon EBS Multi-Attach is enabled.
+		MultiAttachEnabled: createVolumeOutput.MultiAttachEnabled,
+
+		// The Amazon Resource Name (ARN) of the Outpost.
+		OutpostArn: createVolumeOutput.OutpostArn,
+
+		// The size of the volume, in GiBs.
+		Size: createVolumeOutput.Size,
+
+		// The snapshot from which the volume was created, if applicable.
+		SnapshotId: createVolumeOutput.SnapshotId,
+
+		// The volume state.
+		State: createVolumeOutput.State,
+
+		// Any tags assigned to the volume.
+		Tags: createVolumeOutput.Tags,
+
+		// The throughput that the volume supports, in MiB/s.
+		Throughput: createVolumeOutput.Throughput,
+
+		// The ID of the volume.
+		VolumeId: createVolumeOutput.VolumeId,
+
+		// The volume type.
+		VolumeType: createVolumeOutput.VolumeType,
+	}
 }

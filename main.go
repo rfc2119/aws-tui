@@ -43,7 +43,7 @@ func main() {
 	// Using the SDK's default configuration, loading additional config
 	// and credentials values from the environment variables, shared
 	// credentials, and shared configuration files
-	awsMainConfig, err := config.LoadDefaultAWSConfig(context.TODO())
+	awsMainConfig, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		panic("unable to load SDK config, " + err.Error())
 	}
