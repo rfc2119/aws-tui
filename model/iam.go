@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/iam/types"
 	"github.com/rfc2119/aws-tui/common"
 )
 
@@ -18,15 +19,14 @@ type IAModel struct {
 
 func NewIAModel(config aws.Config) *IAModel {
 	return &IAModel{
-		model:   iam.New(config),
+		model:   iam.NewFromConfig(config),
 		Name:    common.AWServicesDescriptions[common.ServiceIdentityAndAccessManagement].Name,
 		Channel: make(chan common.Action),
 	}
 }
 
-func (mdl *IAModel) GetCurrentUserInfo() *iam.User {
-	req := mdl.model.GetUserRequest(&iam.GetUserInput{})
-	resp, err := req.Send(context.Background())
+func (mdl *IAModel) GetCurrentUserInfo() *types.User {
+	resp, err := mdl.model.GetUser(context.TODO(), &iam.GetUserInput{})
 	if err != nil {
 		log.Println(err)
 	}

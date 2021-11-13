@@ -3,7 +3,9 @@ package main
 import (
 	// "context"        // TODO
 	// "runtime/debug"
+	"context"
 	"fmt"
+
 	"github.com/rfc2119/aws-tui/common"
 	"github.com/rfc2119/aws-tui/ui"
 
@@ -18,11 +20,11 @@ Welcome to the unofficial AWS Terminal Interface. This is a very much work-in-pr
 
 Common keys found across all windows:
 
-	TAB             Move to neighboring windows
-	?               View help messages (if available)
-	q               Move back one page (will exit this help message)
-    Space           Select Option in a radio box/tree view (except in a confirmation box)
-    hjkl		Movement keys
+	TAB      Move to neighboring windows
+	?        View help messages (if available)
+	q        Move back one page (will exit this help message)
+  Space    Select Option in a radio box/tree view (except in a confirmation box)
+  hjkl     Movement keys
 
 There's likely a help page for every window, so please use '?' when in doubt. Use Ctrl-C to exit the application.
 `
@@ -59,8 +61,8 @@ func main() {
 	// UI elements
 	mainContainer := tview.NewFlex() // Flex container for the status bar and application pages/window
 	frontPage := ui.NewEFlex(pages)  // The front page which holds the info and tree view
-	info := tview.NewTextView()	// The side bar informational view
-	tree := tview.NewTreeView()	// The menu holding all available services
+	info := tview.NewTextView()      // The side bar informational view
+	tree := tview.NewTreeView()      // The menu holding all available services
 
 	// Filling the tree with initial values
 	rootNode := tview.NewTreeNode("Services")
