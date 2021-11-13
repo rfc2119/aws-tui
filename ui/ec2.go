@@ -2,17 +2,18 @@ package ui
 
 import (
 	"fmt"
-	"github.com/rfc2119/aws-tui/common"
-	"github.com/rfc2119/aws-tui/model"
 	"log"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/rfc2119/aws-tui/common"
+	"github.com/rfc2119/aws-tui/model"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/ec2" // TODO: should probably remove this
+	"github.com/aws/aws-sdk-go-v2/service/ec2/types" // TODO: should probably remove this
 	"github.com/gdamore/tcell"
-	"github.com/rfc2119/simple-state-machine"
+	ssm "github.com/rfc2119/simple-state-machine"
 	"github.com/rivo/tview"
 	// "golang.org/x/crypto/ssh"
 )
@@ -118,8 +119,8 @@ type ec2Service struct {
 	// logger log.Logger        // TODO
 
 	// service specific data
-	instances []ec2.Instance
-	volumes   []ec2.Volume
+	instances []types.Instance
+	volumes   []types.Volume
 }
 
 func NewEC2Service(config aws.Config, app *tview.Application, rootPage *ePages, statBar *StatusBar) *ec2Service {
@@ -222,7 +223,7 @@ func (ec2svc *ec2Service) drawElements() {
 
 	// Instance types allowed in current region
 	var (
-		offerings []ec2.InstanceTypeOffering
+		offerings []types.InstanceTypeOffering
 		err       error
 	)
 	if offerings, err = ec2svc.Model.ListOfferings(); err != nil {
@@ -378,7 +379,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 				detachedDeviceName := tblEditVolume.GetCell(row, COL_EBS_VOL_DEVICE_NAME).Text
 				row, _ = tblVolumes.GetSelection()
 				volId := tblVolumes.GetCell(row, COL_EBS_ID).Text
-				az := aws.StringValue(ec2svc.volumes[row-1].AvailabilityZone)
+				az := aws.ToString(ec2svc.volumes[row-1].AvailabilityZone)
 				switch currOpt {
 				case "Attach":
 					form := tview.NewForm()
@@ -477,7 +478,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 					return
 				}
 				ec2svc.showConfirmationBox(msg, true, func() {
-					if _, err := ec2svc.Model.ModifyVolume(iops, -1, "", volId); err != nil { // alert
+					if _, err := ec2svc.Model.ModifyVolume(int32(iops), -1, "", volId); err != nil { // alert
 						ec2svc.showConfirmationBox(err.Error(), true, nil)
 						return
 					}
@@ -505,7 +506,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 				msg := fmt.Sprintf("Change volume size from %d to %d ?", oldSize, newSize)
 				volId := tblVolumes.GetCell(row, COL_EBS_ID).Text
 				ec2svc.showConfirmationBox(msg, true, func() {
-					if _, err := ec2svc.Model.ModifyVolume(-1, newSize, "", volId); err != nil {
+					if _, err := ec2svc.Model.ModifyVolume(-1, int32(newSize), "", volId); err != nil {
 						ec2svc.showConfirmationBox(err.Error(), true, nil)
 						return
 					}
@@ -536,7 +537,7 @@ func (ec2svc *ec2Service) setDropDownsCallbacks() {
 			volId := tblVolumes.GetCell(row, COL_EBS_ID).Text
 			switch newType {
 			case "io1", "io2":
-				// Min: 100 IOPS, Max: 64000 IOPS
+				// Min: 100 IOPS, Max: 32000 IOPS
 				iops = size * 100
 				msg = fmt.Sprintf("%s\nNote: created with minimum IOPS of %d (100 per GiB)", msg, iops)
 			case "gp2":
@@ -555,16 +556,16 @@ func (ec2svc *ec2Service) setDropDownsCallbacks() {
 				if size < 500 {
 					size = 500
 				}
-				msg = fmt.Sprintf("%s\nNote: created with throughput %v MB/s per GiB [red](size: %d GiB)", msg, 0.012*float32(size), size) // TODO: this is probably wrong
+				msg = fmt.Sprintf("%s\nNote: created with throughput %v MB/s per GiB [red](size: %d GiB)", msg, 0.012*float64(size), size) // TODO: this is probably wrong
 			case "st1":
 				if size < 500 {
 					size = 500
 				}
 				// Baseline: 40 MB/s per TiB
-				msg = fmt.Sprintf("%s\nNote: created with throughput %v MB/s per GiB [red](size: %d GiB)", msg, 0.040*float32(size), size)
+				msg = fmt.Sprintf("%s\nNote: created with throughput %v MB/s per GiB [red](size: %d GiB)", msg, 0.040*float64(size), size)
 			}
 			ec2svc.showConfirmationBox(msg, true, func() {
-				if _, err := ec2svc.Model.ModifyVolume(iops, size, newType, volId); err != nil { // alert
+				if _, err := ec2svc.Model.ModifyVolume(int32(iops), int32(size), newType, volId); err != nil { // alert
 					ec2svc.showConfirmationBox(err.Error(), true, nil)
 					return
 				}
@@ -622,7 +623,7 @@ func listener1(action common.Action) {
 		rowIdx             int
 		indicesColoredRows []int
 	)
-	statuses := action.Data.([]ec2.InstanceStatus)
+	statuses := action.Data.([]types.InstanceStatus)
 	for _, status := range statuses {
 		if rowIdx = rowIndexFromTable(tblInstances, stringFromAWSVar(status.InstanceId)); rowIdx == -1 {
 			continue
@@ -642,9 +643,9 @@ func listener2(action common.Action) {
 		rowIdx             int
 		indicesColoredRows []int
 	)
-	modifications := action.Data.([]ec2.VolumeModification)
+	modifications := action.Data.([]types.VolumeModification)
 	for _, mod := range modifications {
-		if rowIdx = rowIndexFromTable(tblVolumes, aws.StringValue(mod.VolumeId)); rowIdx == -1 {
+		if rowIdx = rowIndexFromTable(tblVolumes, aws.ToString(mod.VolumeId)); rowIdx == -1 {
 			continue
 		}
 		iopsCell := tblVolumes.GetCell(rowIdx, COL_EBS_IOPS)
@@ -878,7 +879,7 @@ func chooseAMIFilters(ec2svc *ec2Service) {
 	buttonSaveFunc := func() {
 		ec2svc.StatusBar.SetText("Grabbing the list of AMIs")
 		var (
-			amis []ec2.Image
+			amis []types.Image
 			err  error
 		)
 		if amis, err = ec2svc.Model.ListAMIs(filters); err != nil {
@@ -974,9 +975,9 @@ func createVolume(ec2svc *ec2Service) {
 		snapshotId := inputFieldSnapshotId.GetText()
 		isEncrypted := checkBoxEncryptVolume.IsChecked()
 		isMultiAttached := checkBoxMultiAttach.IsChecked()
-		if newVolume, err := ec2svc.Model.CreateVolume(iops, size, volType, snapshotId, az, isEncrypted, isMultiAttached); err == nil {
+		if newVolume, err := ec2svc.Model.CreateVolume(int32(iops), int32(size), volType, snapshotId, az, isEncrypted, isMultiAttached); err == nil {
 			ec2svc.StatusBar.SetText(fmt.Sprintf("Creating EBS Volume with ID %s. Refresh the list of volumes", stringFromAWSVar(newVolume.VolumeId)))
-			ec2svc.volumes = append(ec2svc.volumes, ec2.Volume(newVolume)) // TODO: do that as well in other methods
+			ec2svc.volumes = append(ec2svc.volumes, types.Volume(newVolume)) // TODO: do that as well in other methods
 			ec2svc.RootPage.ESwitchToPreviousPage()
 			return
 		}
