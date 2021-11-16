@@ -2,7 +2,6 @@ package model
 
 import (
 	"context"
-	"log"
 	"strings"
 	"time"
 
@@ -33,7 +32,7 @@ func NewEC2Model(config aws.Config) *EC2Model {
 }
 
 func (mdl *EC2Model) StartEC2Instances(instanceIds []string) ([]types.InstanceStateChange, error) {
-
+	// TODO: function docstring
 	resp, err := mdl.model.StartInstances(context.TODO(), &ec2.StartInstancesInput{
 		InstanceIds: instanceIds,
 	})
@@ -81,7 +80,6 @@ func (mdl *EC2Model) GetEC2Instances() ([]types.Instance, error) {
 	// TODO:
 	var (
 		instances []types.Instance
-		err       error
 	)
 	// Version 2 of the SDK addresses the above issues, and provides context per page.
 	// It also enables easy iteration over API results that span multiple page. Here’s
@@ -97,10 +95,7 @@ func (mdl *EC2Model) GetEC2Instances() ([]types.Instance, error) {
 			instances = append(instances, reservation.Instances...)
 		}
 	}
-	// if paginator.Err() != nil {
-	// 	return nil, paginator.Err()
-	// }
-	return instances, err
+	return instances, nil
 }
 
 // Lists all instance types offered in the default region
@@ -123,7 +118,6 @@ func (mdl *EC2Model) ListAMIs(filterMap map[string]string) ([]types.Image, error
 			Name:   aws.String(filterName),
 			Values: strings.Split(filterValue, ","),
 		})
-		// }
 	}
 	resp, err := mdl.model.DescribeImages(context.TODO(), &ec2.DescribeImagesInput{Filters: filters})
 	if err != nil {
@@ -146,7 +140,6 @@ func (mdl *EC2Model) ListVolumes() ([]types.Volume, error) {
 	// TODO:  function docstring
 	var (
 		volumes []types.Volume
-		err     error
 	)
 	paginator := ec2.NewDescribeVolumesPaginator(mdl.model, &ec2.DescribeVolumesInput{})
 	for paginator.HasMorePages() {
@@ -157,7 +150,7 @@ func (mdl *EC2Model) ListVolumes() ([]types.Volume, error) {
 		volumes = append(volumes, page.Volumes...)
 	}
 
-	return volumes, err
+	return volumes, nil
 }
 func (mdl *EC2Model) AttachVolume(volId, instId, dev string) (ec2.AttachVolumeOutput, error) {
 	// TODO:  function docstring
@@ -215,6 +208,7 @@ func (mdl *EC2Model) DeleteVolume(volId string) (ec2.DeleteVolumeOutput, error) 
 	}
 	return *resp, nil
 }
+
 func (mdl *EC2Model) CreateVolume(iops, size int32, volType, snapshotId, az string, isEncrypted, isMultiAttached bool) (ec2.CreateVolumeOutput, error) {
 	// TODO:  function docstring
 	// TODO: tags
@@ -242,23 +236,23 @@ func (mdl *EC2Model) CreateVolume(iops, size int32, volType, snapshotId, az stri
 }
 
 // TODO: I don't understand yet why this is better than a simple print
-func printAWSError(err error) error {
-	// TODO:  function docstring
-	if err != nil {
-		log.Println(err.Error())
-		// if aerr, ok := err.(awserr.Error); ok {
-		// 	switch aerr.Code() {
-		// 	default:
-		// 		log.Println(aerr.Error())
-		// 	}
-		// } else {
-		// 	// Print the error, cast err to awserr.Error to get the Code and
-		// 	// Message from an error.
-		// 	log.Println(err.Error())
-		// }
-	}
-	return err
-}
+// func printAWSError(err error) error {
+// 	// TODO:  function docstring
+// 	if err != nil {
+// 		log.Println(err.Error())
+// 		// if aerr, ok := err.(awserr.Error); ok {
+// 		// 	switch aerr.Code() {
+// 		// 	default:
+// 		// 		log.Println(aerr.Error())
+// 		// 	}
+// 		// } else {
+// 		// 	// Print the error, cast err to awserr.Error to get the Code and
+// 		// 	// Message from an error.
+// 		// 	log.Println(err.Error())
+// 		// }
+// 	}
+// 	return err
+// }
 
 // DispatchWatchers sets the appropriate timer and calls each watcher
 func (mdl *EC2Model) DispatchWatchers() {
@@ -278,8 +272,11 @@ func (mdl *EC2Model) DispatchWatchers() {
 func watcher1(client *ec2.Client, ch chan<- common.Action, describeAll bool) {
 	var (
 		statuses []types.InstanceStatus
-		// err error
 	)
+	action := common.Action{
+		Type: common.ActionInstancesStatusUpdate,
+		Data: statuses,
+	}
 	params := &ec2.DescribeInstanceStatusInput{
 		IncludeAllInstances: aws.Bool(describeAll),
 	}
@@ -287,33 +284,33 @@ func watcher1(client *ec2.Client, ch chan<- common.Action, describeAll bool) {
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(context.TODO())
 		if err != nil {
-			printAWSError(err) // TODO: logging and error handling
-			return
+			action.Type = common.ActionError
+			action.Data = err
+			break
 		}
 		statuses = append(statuses, page.InstanceStatuses...)
-	}
-	action := common.Action{
-		Type: common.ACTION_INSTANCES_STATUS_UPDATE,
-		Data: statuses,
 	}
 	ch <- action
 }
 
 func watcher2(client *ec2.Client, ch chan<- common.Action) { // TODO: filters ?
-	var modifications []types.VolumeModification
+	var (
+		modifications []types.VolumeModification
+	)
+	action := common.Action{
+		Type: common.ActionVolumeModified,
+		Data: []types.VolumeModification{},
+	}
 	params := &ec2.DescribeVolumesModificationsInput{}
 	paginator := ec2.NewDescribeVolumesModificationsPaginator(client, params)
 	for paginator.HasMorePages() {
 		page, err := paginator.NextPage(context.TODO())
 		if err != nil {
-			printAWSError(err) // TODO: logging and error handling
-			return
+			action.Type = common.ActionError
+			action.Data = err
+			break
 		}
 		modifications = append(modifications, page.VolumesModifications...)
-	}
-	action := common.Action{
-		Type: common.ACTION_VOLUME_MODIFIED,
-		Data: modifications,
 	}
 	ch <- action
 }

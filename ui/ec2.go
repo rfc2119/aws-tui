@@ -382,7 +382,7 @@ func (ec2svc *ec2Service) setCallbacks() {
 				detachedDeviceName := tblEditVolume.GetCell(row, COL_EBS_VOL_DEVICE_NAME).Text
 				row, _ = tblVolumes.GetSelection()
 				volId := tblVolumes.GetCell(row, COL_EBS_ID).Text
-				az := aws.ToString(ec2svc.volumes[row-1].AvailabilityZone)
+				az := stringFromAWSVar(ec2svc.volumes[row-1].AvailabilityZone)
 				switch currOpt {
 				case "Attach":
 					form := tview.NewForm()
@@ -584,17 +584,19 @@ func (ec2svc *ec2Service) setDropDownsCallbacks() {
 func (svc *ec2Service) WatchChanges() {
 	svc.Model.DispatchWatchers()
 	go func(ch <-chan common.Action) { // listener goroutine
+		// var oe *smithy.OperationError
 		for action := range ch { // poll channel for eternity
-			// switch action.Data.(type){
 			switch action.Type {
-			case common.ACTION_INSTANCES_STATUS_UPDATE:
+			case common.ActionInstancesStatusUpdate:
 				go listener1(action)
-			case common.ACTION_VOLUME_MODIFIED:
+			case common.ActionVolumeModified:
 				go listener2(action)
-			case common.ACTION_ERROR:
-				// TODO
+			case common.ActionError:
+				if err, ok := action.Data.(error); ok {
+					svc.StatusBar.SetText(fmt.Sprintf("watcher: %v", err))
+				}
 			default:
-				log.Printf("received invalid data of type %T", action.Data)
+				log.Printf("received invalid data of type %T", action.Type)
 			}
 		}
 	}(svc.Model.Channel)
@@ -648,7 +650,7 @@ func listener2(action common.Action) {
 	)
 	modifications := action.Data.([]types.VolumeModification)
 	for _, mod := range modifications {
-		if rowIdx = rowIndexFromTable(tblVolumes, aws.ToString(mod.VolumeId)); rowIdx == -1 {
+		if rowIdx = rowIndexFromTable(tblVolumes, stringFromAWSVar(mod.VolumeId)); rowIdx == -1 {
 			continue
 		}
 		iopsCell := tblVolumes.GetCell(rowIdx, COL_EBS_IOPS)

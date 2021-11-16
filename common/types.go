@@ -2,15 +2,24 @@ package common
 
 // v2 of the aws go sdk is used
 
-const (
-	ACTION_INSTANCES_STATUS_UPDATE = iota
-	// ACTION_INSTANCE_STATUS_UPDATE
-	ACTION_VOLUME_MODIFIED
-	ACTION_ERROR // TODO
+type actionType int
+// this is the generic action structure. the data field is an interface. this permits all other structures (defined next) to be passed onto the channel. on the receiving side of the work channel, each receiver should assert the type of the data field and act accordingly
+type Action struct {
+	Type actionType
+	Data interface{}
+}
 
+const (
+	ActionInstancesStatusUpdate actionType = iota
+	// ACTION_INSTANCE_STATUS_UPDATE
+	ActionVolumeModified
+	ActionError // TODO
+)
+
+const (
 	// Defining the services themselves as numeric constants
 	// Used onwards to tweak service names and configs. This will probably be replaced
-	ServiceEc2
+	ServiceEc2 int = iota
 	ServiceLambda
 	ServiceVirtualPrivateCloud
 	ServiceElasticBeanstalk
@@ -94,6 +103,7 @@ const (
 	ServiceSagemaker
 	ServiceGamelift
 	ServiceElementalMediaconvert
+	ServiceSecurityToken
 
 	// filters
 	FILTER_AFFINITY
@@ -552,6 +562,9 @@ var AWServicesDescriptions = map[int]awsServiceDescription{
 
 	ServiceElementalMediaconvert: {
 		Name: "AWS Elemental MediaConvert", Description: "Process video files and clips to prepare on-demand content for distribution or archiving", Available: false},
+
+	ServiceSecurityToken: {
+		Name: "STS", Description: "Security Token Service Security Token Service (STS) enables you to request temporary, limited-privilege credentials for Identity and Access Management (IAM) users or for users that you authenticate (federated users)", Available: false},
 }
 
 // convenient maps *shrugs*
@@ -681,11 +694,6 @@ var FilterNames = map[int][]string{
 
 // actions are defined for each service. right now, this is a way to define the behavior that the view should follow. in some sense, there ought to be some generalization of this instead of defining everything manually, but we'll see how things goes
 
-// this is the generic action structure. the data field is an interface. this permits all other structures (defined next) to be passed onto the channel. on the receiving side of the work channel, each receiver should assert the type of the data field and act accordingly
-type Action struct {
-	Type int
-	Data interface{}
-}
 
 // UPDATE: will deprecate these for now
 // these are the manually defined data structures that any first party
